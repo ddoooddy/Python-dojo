@@ -275,6 +275,27 @@
   }
   .hint-box strong { color: var(--amber); font-weight: 650; }
 
+  /* ---------- Análisis de código ---------- */
+  .analysis-box { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); margin-bottom: 12px; overflow: hidden; }
+  .an-head {
+    padding: 10px 18px; font-size: 11px; font-weight: 650;
+    text-transform: uppercase; letter-spacing: .09em; color: var(--text-2);
+    background: var(--code-bg); border-bottom: 1px solid var(--border);
+  }
+  .an-row { display: flex; gap: 14px; padding: 10px 18px; border-bottom: 1px solid var(--border); font-size: 13.5px; line-height: 1.6; }
+  .an-row:last-child { border-bottom: none; }
+  .an-label { flex: 0 0 130px; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-3); font-weight: 600; padding-top: 3px; }
+  .an-val { flex: 1; min-width: 0; }
+  .an-val ul { padding-left: 18px; margin: 0; }
+  .an-val li { margin: 3px 0; }
+  .an-ok { color: var(--green); font-weight: 550; }
+  .an-bad { color: var(--red); font-weight: 550; }
+  .an-line { color: var(--text-3); font-size: 12px; margin-right: 6px; font-variant-numeric: tabular-nums; }
+  .dbg-vars {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px 12px; font-size: 13px; max-height: 220px; overflow-y: auto; line-height: 1.7;
+  }
+
   .sol-wrap { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin: 18px 0; background: var(--surface); }
   .sol-head {
     padding: 12px 24px; font-size: 11px; font-weight: 600;
@@ -372,6 +393,8 @@
     .chip { min-width: 40px; height: 40px; }
     .topic-item { padding: 10px 22px; }
     .modal { padding: 24px 20px; max-height: 90vh; }
+    .an-row { flex-direction: column; gap: 4px; }
+    .an-label { flex: none; padding-top: 0; }
   }
 </style>
 </head>
@@ -444,6 +467,7 @@
           <button class="btn btn-primary" id="btn-tut-next" style="display:none">Siguiente paso</button>
           <span class="kbd-hint"><kbd>⌘/Ctrl</kbd> + <kbd>Enter</kbd> <span id="kbd-action">verifica</span></span>
         </div>
+        <div id="analysis-area"></div>
         <div id="feedback"></div>
         <div id="hints-area"></div>
         <div id="solution-area"></div>
@@ -481,6 +505,20 @@
     <div id="review-list"></div>
     <div class="soc-buttons" style="margin-top:14px">
       <button class="btn-quiet" id="review-close">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Depuración guiada -->
+<div class="overlay hidden" id="debug-overlay">
+  <div class="modal">
+    <h2>Depuración guiada</h2>
+    <div class="modal-sub" id="dbg-subtitle"></div>
+    <div class="soc-progress" id="dbg-progress"></div>
+    <div id="dbg-body"></div>
+    <div class="soc-buttons" style="margin-top:16px">
+      <button class="btn-quiet" id="dbg-close">Cerrar</button>
+      <button class="btn btn-primary" id="dbg-next">Siguiente</button>
     </div>
   </div>
 </div>
@@ -546,6 +584,8 @@ const state = {
   hintsShown: 0,
   playground: false,
   soc: { steps: [], idx: 0 },
+  debug: { steps: [], idx: 0 },
+  analyzerReady: false,
   pyodide: null,
   pyLoading: null,
   numpyLoaded: false,
@@ -923,6 +963,7 @@ function renderTutorial() {
 
   setCode(step.code);
   document.getElementById("output-box").textContent = "";
+  clearAnalysis();
   document.getElementById("feedback").innerHTML = "";
   document.getElementById("hints-area").innerHTML = "";
   document.getElementById("solution-area").innerHTML = "";
@@ -962,6 +1003,7 @@ function renderExercise() {
   applyHighlights(prompt);
   setCode(rec.code != null ? rec.code : ex.starter);
   document.getElementById("output-box").textContent = "";
+  clearAnalysis();
   document.getElementById("feedback").innerHTML = "";
   document.getElementById("hints-area").innerHTML = "";
   document.getElementById("solution-area").innerHTML = "";
@@ -1001,6 +1043,7 @@ function openPlayground() {
   setToolbarMode("playground");
   setCode(state.progress.playgroundCode || PLAYGROUND_SAMPLE);
   document.getElementById("output-box").textContent = "";
+  clearAnalysis();
   document.getElementById("feedback").innerHTML = "";
   document.getElementById("hints-area").innerHTML = "";
   document.getElementById("solution-area").innerHTML = "";
@@ -1095,6 +1138,382 @@ for _name, _mod in list(sys.modules.items()):
   }
 }
 
+/* ============================================================
+   Análisis automático de código (AST de Python vía Pyodide)
+   ============================================================ */
+function escHtml(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+const ANALYZER_PY = String.raw`
+import ast as _ast, json as _json, io as _io, sys as _sys, traceback as _tb, types as _types
+
+def _dojo_esc(s):
+    return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+_DOJO_BUILTINS = set(["list", "dict", "set", "str", "int", "float", "sum", "max", "min", "type", "input", "id", "len", "sorted", "tuple", "range", "map", "filter", "next", "bool", "print"])
+
+def _dojo_targets(t):
+    if isinstance(t, _ast.Name):
+        yield t
+    elif isinstance(t, (_ast.Tuple, _ast.List)):
+        for e in t.elts:
+            for x in _dojo_targets(e):
+                yield x
+
+def _dojo_analyze(code):
+    try:
+        tree = _ast.parse(code)
+    except SyntaxError:
+        return _json.dumps({"syntax": True, "issues": [], "positives": []})
+    issues = []
+    def add(cat, line, msg):
+        issues.append({"cat": cat, "line": line, "msg": msg})
+
+    with_opens = set()
+    used_names = set()
+    for node in _ast.walk(tree):
+        if isinstance(node, _ast.With):
+            for item in node.items:
+                ce = item.context_expr
+                if isinstance(ce, _ast.Call) and isinstance(ce.func, _ast.Name) and ce.func.id == "open":
+                    with_opens.add(ce.lineno)
+        if isinstance(node, _ast.Name) and isinstance(node.ctx, _ast.Load):
+            used_names.add(node.id)
+
+    for node in _ast.walk(tree):
+        if isinstance(node, _ast.Import):
+            for a in node.names:
+                base = (a.asname or a.name).split(".")[0]
+                if base not in used_names:
+                    add("practicas", node.lineno, "importás <code>" + _dojo_esc(a.name) + "</code> pero nunca se usa: el código muerto confunde al lector.")
+
+        if isinstance(node, _ast.Call) and isinstance(node.func, _ast.Name) and node.func.id == "open" and node.lineno not in with_opens:
+            add("practicas", node.lineno, "abrís un archivo sin <code>with</code>: si algo falla en el medio, queda sin cerrar. <code>with open(...) as f:</code> lo garantiza.")
+
+        if isinstance(node, _ast.ExceptHandler):
+            if node.type is None:
+                add("practicas", node.lineno, "un <code>except:</code> pelado atrapa TODO, incluso errores que querrías ver. Nombrá la excepción que esperás: <code>except ValueError:</code>.")
+            if len(node.body) == 1 and isinstance(node.body[0], _ast.Pass):
+                add("practicas", node.lineno, "<code>except ... pass</code> silencia errores sin dejar rastro: el bug va a reaparecer lejos de su causa. Manejalo o al menos registralo.")
+
+        if isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
+            for d in list(node.args.defaults) + [x for x in node.args.kw_defaults if x is not None]:
+                if isinstance(d, (_ast.List, _ast.Dict, _ast.Set)):
+                    add("practicas", node.lineno, "default mutable en la función <code>" + _dojo_esc(node.name) + "</code>: la lista/dict default se comparte entre TODAS las llamadas. Usá <code>None</code> y crealo adentro.")
+
+        if isinstance(node, _ast.Assign):
+            for t in node.targets:
+                for n in _dojo_targets(t):
+                    if n.id in _DOJO_BUILTINS:
+                        add("practicas", n.lineno, "la variable <code>" + _dojo_esc(n.id) + "</code> pisa una función integrada de Python: después <code>" + _dojo_esc(n.id) + "(...)</code> deja de funcionar. Elegí otro nombre.")
+        if isinstance(node, _ast.For):
+            for n in _dojo_targets(node.target):
+                if n.id in _DOJO_BUILTINS:
+                    add("practicas", n.lineno, "la variable del loop <code>" + _dojo_esc(n.id) + "</code> pisa una función integrada de Python. Elegí otro nombre.")
+
+        if isinstance(node, _ast.Compare) and len(node.ops) == 1:
+            comp = node.comparators[0]
+            if isinstance(comp, _ast.Constant):
+                if comp.value is None and isinstance(node.ops[0], (_ast.Eq, _ast.NotEq)):
+                    add("practicas", node.lineno, "para comparar con <code>None</code> se usa <code>is None</code> / <code>is not None</code>, no <code>==</code>.")
+                elif comp.value is True and isinstance(node.ops[0], _ast.Eq):
+                    add("practicas", node.lineno, "<code>== True</code> sobra: <code>if condicion:</code> ya pregunta eso.")
+                elif comp.value is False and isinstance(node.ops[0], _ast.Eq):
+                    add("practicas", node.lineno, "<code>== False</code> se escribe <code>if not condicion:</code>.")
+            if isinstance(node.left, _ast.Call) and isinstance(node.left.func, _ast.Name) and node.left.func.id == "len":
+                if isinstance(comp, _ast.Constant) and comp.value == 0:
+                    if isinstance(node.ops[0], _ast.Eq):
+                        add("practicas", node.lineno, "<code>len(x) == 0</code> se escribe <code>if not x:</code> — las colecciones vacías ya son falsas.")
+                    elif isinstance(node.ops[0], (_ast.Gt, _ast.NotEq)):
+                        add("practicas", node.lineno, "<code>len(x) > 0</code> se escribe <code>if x:</code> — las colecciones con contenido ya son verdaderas.")
+
+        if isinstance(node, _ast.UnaryOp) and isinstance(node.op, _ast.Not) and isinstance(node.operand, _ast.Compare) and len(node.operand.ops) == 1:
+            op = node.operand.ops[0]
+            if isinstance(op, _ast.Eq):
+                add("practicas", node.lineno, "<code>not a == b</code> se lee mejor como <code>a != b</code>.")
+            elif isinstance(op, _ast.In):
+                add("practicas", node.lineno, "<code>not a in b</code> se escribe <code>a not in b</code>.")
+
+        if isinstance(node, _ast.If):
+            def _is_ret(body, val):
+                return len(body) == 1 and isinstance(body[0], _ast.Return) and isinstance(body[0].value, _ast.Constant) and body[0].value.value is val
+            if (_is_ret(node.body, True) and _is_ret(node.orelse, False)):
+                add("practicas", node.lineno, "<code>if cond: return True / else: return False</code> es simplemente <code>return cond</code> (o <code>return bool(cond)</code>).")
+            elif (_is_ret(node.body, False) and _is_ret(node.orelse, True)):
+                add("practicas", node.lineno, "este if/else se reduce a <code>return not cond</code>.")
+
+        if isinstance(node, _ast.BoolOp) and isinstance(node.op, _ast.And) and len(node.values) == 2:
+            a, b = node.values
+            if (isinstance(a, _ast.Compare) and isinstance(b, _ast.Compare) and len(a.ops) == 1 and len(b.ops) == 1
+                    and isinstance(a.comparators[0], _ast.Name) and isinstance(b.left, _ast.Name)
+                    and a.comparators[0].id == b.left.id
+                    and all(isinstance(o, (_ast.Lt, _ast.LtE)) for o in (a.ops[0], b.ops[0]))):
+                add("practicas", node.lineno, "Python permite encadenar comparaciones: <code>a &lt; x &lt; b</code> en una sola expresión, sin <code>and</code>.")
+
+        if isinstance(node, _ast.While) and isinstance(node.test, _ast.Constant) and node.test.value is True:
+            if not any(isinstance(x, (_ast.Break, _ast.Return, _ast.Raise)) for x in _ast.walk(node)):
+                add("practicas", node.lineno, "<code>while True</code> sin <code>break</code>, <code>return</code> ni <code>raise</code> a la vista: ¿cómo termina este loop? Acá congelaría la pestaña.")
+
+        if isinstance(node, _ast.Global):
+            add("practicas", node.lineno, "<code>global</code> funciona, pero suele ser señal de que la función debería recibir el valor como parámetro y devolver el resultado.")
+
+        if isinstance(node, _ast.For):
+            it = node.iter
+            if (isinstance(it, _ast.Call) and isinstance(it.func, _ast.Name) and it.func.id == "range"
+                    and len(it.args) == 1 and isinstance(it.args[0], _ast.Call)
+                    and isinstance(it.args[0].func, _ast.Name) and it.args[0].func.id == "len"):
+                add("practicas", node.lineno, "<code>for i in range(len(xs))</code> + indexar es el patrón que <code>enumerate</code> reemplaza: <code>for i, x in enumerate(xs):</code> te da índice y valor a la vez.")
+
+            if len(node.body) == 1:
+                st = node.body[0]
+                inner = None
+                if isinstance(st, _ast.Expr):
+                    inner = st
+                elif isinstance(st, _ast.If) and len(st.body) == 1 and not st.orelse and isinstance(st.body[0], _ast.Expr):
+                    inner = st.body[0]
+                if inner is not None and isinstance(inner.value, _ast.Call) and isinstance(inner.value.func, _ast.Attribute) and inner.value.func.attr == "append":
+                    add("eficiencia", node.lineno, "loop que solo hace <code>.append</code>: una comprensión de listas dice lo mismo en una línea — <code>[expr for x in xs if cond]</code> — y es más rápida.")
+
+            if len(node.body) == 1 and isinstance(node.body[0], _ast.AugAssign) and isinstance(node.body[0].op, _ast.Add):
+                val = node.body[0].value
+                if isinstance(val, _ast.Constant) and val.value == 1:
+                    add("eficiencia", node.lineno, "contar con <code>c += 1</code> en un loop: <code>len(xs)</code> si contás todo, o <code>sum(1 for x in xs if cond)</code> si contás con condición.")
+                elif isinstance(val, _ast.Name) and isinstance(node.target, _ast.Name) and val.id == node.target.id:
+                    add("eficiencia", node.lineno, "acumular con <code>total += x</code> en un loop entero es <code>sum(xs)</code> directo.")
+
+            for x in _ast.walk(node):
+                if isinstance(x, _ast.AugAssign) and isinstance(x.op, _ast.Add) and (isinstance(x.value, _ast.JoinedStr) or (isinstance(x.value, _ast.Constant) and isinstance(x.value.value, str))):
+                    add("eficiencia", x.lineno, "concatenar strings con <code>+=</code> dentro de un loop copia el texto entero cada vuelta. Acumulá las partes en una lista y uní al final con <code>''.join(partes)</code>.")
+                    break
+
+        if isinstance(node, _ast.Subscript) and isinstance(node.value, _ast.Call) and isinstance(node.value.func, _ast.Name) and node.value.func.id == "sorted":
+            sl = node.slice
+            _Index = getattr(_ast, "Index", None)
+            if _Index is not None and isinstance(sl, _Index):
+                sl = sl.value
+            if isinstance(sl, _ast.Constant) and sl.value == 0:
+                add("eficiencia", node.lineno, "ordenar todo para quedarte con el primero es O(n log n): <code>min(xs)</code> lo hace en O(n).")
+            elif isinstance(sl, _ast.UnaryOp) and isinstance(sl.op, _ast.USub) and isinstance(sl.operand, _ast.Constant) and sl.operand.value == 1:
+                add("eficiencia", node.lineno, "ordenar todo para quedarte con el último es O(n log n): <code>max(xs)</code> lo hace en O(n).")
+
+    has = {"comp": False, "with": False, "fstr": False, "enum": False, "get": False, "doc": False, "hints": False, "exc": False}
+    for node in _ast.walk(tree):
+        if isinstance(node, (_ast.ListComp, _ast.DictComp, _ast.SetComp, _ast.GeneratorExp)):
+            has["comp"] = True
+        elif isinstance(node, _ast.With):
+            has["with"] = True
+        elif isinstance(node, _ast.JoinedStr):
+            has["fstr"] = True
+        elif isinstance(node, _ast.Call) and isinstance(node.func, _ast.Name) and node.func.id in ("enumerate", "zip"):
+            has["enum"] = True
+        elif isinstance(node, _ast.Call) and isinstance(node.func, _ast.Attribute) and node.func.attr == "get" and node.args:
+            has["get"] = True
+        elif isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
+            if _ast.get_docstring(node):
+                has["doc"] = True
+            if node.returns or any(a.annotation for a in node.args.args):
+                has["hints"] = True
+        elif isinstance(node, _ast.ExceptHandler) and node.type is not None:
+            has["exc"] = True
+    labels = [
+        ("comp", "comprensiones en lugar de loops manuales"),
+        ("with", "<code>with</code> para manejar recursos"),
+        ("fstr", "f-strings para formatear"),
+        ("enum", "<code>enumerate</code>/<code>zip</code> en lugar de índices a mano"),
+        ("get", "<code>.get</code> para claves que pueden faltar"),
+        ("doc", "docstrings en tus funciones"),
+        ("hints", "type hints"),
+        ("exc", "<code>except</code> de excepciones específicas"),
+    ]
+    positives = [lab for key, lab in labels if has[key]][:4]
+
+    seen = {}
+    final = []
+    for it in sorted(issues, key=lambda x: (x["line"] or 0)):
+        k = it["msg"][:40]
+        seen[k] = seen.get(k, 0) + 1
+        if seen[k] <= 2:
+            final.append(it)
+    prac = [i for i in final if i["cat"] == "practicas"][:4]
+    efi = [i for i in final if i["cat"] == "eficiencia"][:3]
+    return _json.dumps({"syntax": False, "issues": prac + efi, "positives": positives})
+
+def _dojo_debug_run(code):
+    ns = {}
+    out = _io.StringIO()
+    err = None
+    old = _sys.stdout
+    _sys.stdout = out
+    try:
+        exec(compile(code, "<tu codigo>", "exec"), ns)
+    except BaseException as e:
+        line = None
+        if isinstance(e, SyntaxError):
+            line = e.lineno
+        else:
+            for fr in _tb.extract_tb(e.__traceback__):
+                if fr.filename == "<tu codigo>":
+                    line = fr.lineno
+        err = {"type": type(e).__name__, "msg": str(e), "line": line}
+    finally:
+        _sys.stdout = old
+    vars_out = []
+    for k, v in ns.items():
+        if k.startswith("_"):
+            continue
+        if isinstance(v, _types.ModuleType):
+            continue
+        if isinstance(v, type):
+            desc = "(clase definida)"
+        elif callable(v):
+            desc = "(función definida)"
+        else:
+            r = repr(v)
+            if len(r) > 110:
+                r = r[:110] + "…"
+            desc = r
+        vars_out.append({"name": k, "value": desc})
+        if len(vars_out) >= 14:
+            break
+    return _json.dumps({"vars": vars_out, "stdout": out.getvalue()[:1200], "error": err})
+`;
+
+function ensureAnalyzer(py) {
+  if (!state.analyzerReady) {
+    py.runPython(ANALYZER_PY);
+    state.analyzerReady = true;
+  }
+}
+async function analyzeCode(code) {
+  const py = await ensurePyodide();
+  ensureAnalyzer(py);
+  const fn = py.globals.get("_dojo_analyze");
+  const out = fn(code);
+  fn.destroy();
+  return JSON.parse(out);
+}
+async function debugSnapshot(code) {
+  const py = await ensurePyodide();
+  if (state.currentLevel === "numpy" || state.currentLevel === "ml" || /\bnumpy\b/.test(code)) await ensureNumpy(py);
+  ensureAnalyzer(py);
+  const fn = py.globals.get("_dojo_debug_run");
+  const out = fn(code);
+  fn.destroy();
+  return JSON.parse(out);
+}
+
+function renderAnalysis(res, analysis) {
+  const area = document.getElementById("analysis-area");
+  const isAssert = !res.ok && res.raw && res.raw.includes("AssertionError");
+  const funciona = res.ok
+    ? `<span class="an-ok">Sí.</span> El código corre y pasó todos los tests.`
+    : isAssert
+      ? `<span class="an-bad">Todavía no.</span> El código corre, pero no hace exactamente lo que pide el problema — el test que falló está abajo.`
+      : `<span class="an-bad">No.</span> El código falla antes de terminar — el error está abajo.`;
+  const row = (label, val) => `<div class="an-row"><div class="an-label">${label}</div><div class="an-val">${val}</div></div>`;
+  const list = (items) => `<ul>` + items.map(i => `<li>${i.line ? `<span class="an-line">línea ${i.line}</span>` : ""}${i.msg}</li>`).join("") + `</ul>`;
+  let html = `<div class="analysis-box"><div class="an-head">Análisis de tu solución</div>`;
+  html += row("¿Funciona?", funciona);
+  if (analysis && !analysis.syntax) {
+    const prac = analysis.issues.filter(i => i.cat === "practicas");
+    const efi = analysis.issues.filter(i => i.cat === "eficiencia");
+    html += row("Buenas prácticas", prac.length ? list(prac) : "Nada para señalar.");
+    html += row("Eficiencia", efi.length ? list(efi) : "Sin problemas evidentes.");
+    if (analysis.positives && analysis.positives.length) html += row("Lo que está bien", "Usás " + analysis.positives.join(", ") + ".");
+  } else if (analysis && analysis.syntax) {
+    html += row("Estilo", "El análisis de estilo llega cuando la sintaxis sea válida.");
+  }
+  html += `</div>`;
+  area.innerHTML = html;
+}
+function clearAnalysis() { document.getElementById("analysis-area").innerHTML = ""; }
+
+/* ---------- depuración guiada (socrática) ---------- */
+const DEBUG_QA = {
+  NameError: (m) => { const n = (m.match(/name '([^']+)'/) || [])[1]; return `<p>Python dice que <code>${escHtml(n || "ese nombre")}</code> no existe en el momento en que se usa. Tres preguntas: ¿en qué línea se crea? ¿Esa línea se ejecuta <em>antes</em> en el tiempo — no en el archivo, en el tiempo? ¿Está escrito exactamente igual, mayúsculas incluidas?</p>`; },
+  TypeError: () => `<p>¿Qué tipo creías que tenía cada valor de la operación que falló? Mirá la tabla del paso anterior: ¿cuál <em>no</em> es del tipo que asumiste? Un <code>print(type(x))</code> justo antes de la línea del error te lo confirma.</p>`,
+  ValueError: () => `<p>El tipo está bien pero el contenido no sirve para esa operación. ¿Qué valor exacto llega (paso anterior)? ¿De dónde sale — un cálculo, una conversión, un dato fijo? ¿En qué caso ese origen produce algo inesperado?</p>`,
+  IndexError: () => `<p>¿Cuántos elementos tiene la colección <em>de verdad</em> (mirá el paso anterior)? ¿Qué índice pediste? Recordá: el último índice válido es <code>len - 1</code>. ¿Quién de los dos no es lo que creías — la colección o el índice?</p>`,
+  KeyError: () => `<p>¿La clave que pedís existe <em>exactamente</em> así? Compará letra por letra (espacios y mayúsculas cuentan) contra las claves reales del paso anterior. Si la clave puede faltar legítimamente, ¿conocés <code>.get(clave, default)</code>?</p>`,
+  ZeroDivisionError: () => `<p>¿Qué variable terminó valiendo 0 (paso anterior)? ¿En qué caso pasa eso — una lista vacía, un contador que nunca se incrementó? ¿Tu código contempla ese caso o lo asume imposible?</p>`,
+  AttributeError: () => `<p>¿La variable es del tipo que creés? El caso más común: vale <code>None</code> porque una función no devolvió nada — ¿le falta el <code>return</code>? Mirá su valor real en el paso anterior.</p>`,
+  UnboundLocalError: () => `<p>Dentro de la función, ¿asignás esa variable en <em>alguna</em> rama (aunque sea más abajo)? Eso la vuelve local en TODA la función, incluso antes de la asignación. ¿Debería ser un parámetro?</p>`,
+  RecursionError: () => `<p>¿Cuál es el caso base — la condición que corta la cadena de llamadas? ¿Existe? ¿Y cada llamada se acerca a él, o hay un argumento que nunca cambia?</p>`,
+  IndentationError: () => `<p>El error es de escritura, no de lógica. Mirá la línea señalada y la anterior: ¿la sangría es consistente (4 espacios por nivel)? ¿Hay un espacio de más o de menos al inicio?</p>`,
+  SyntaxError: () => `<p>El error es de escritura, no de lógica. Mirá la línea señalada y la <em>anterior</em>: ¿paréntesis o comillas sin cerrar? ¿Faltan los dos puntos al final de un <code>if</code>/<code>for</code>/<code>def</code>? ¿Un <code>=</code> donde iba <code>==</code>?</p>`,
+};
+
+function buildDebugSteps(snap) {
+  const err = snap && snap.error ? snap.error : null;
+  const steps = [];
+  steps.push({
+    title: "Tu hipótesis",
+    html: `<p>Antes de mirar nada: escribí qué <strong>debería</strong> pasar. ¿Qué valor tendría que tener la variable clave? ¿Qué tendría que imprimirse? Sé específico — “total debería ser 42”, no “debería andar”. Sin hipótesis no hay debugging: solo hay mirar fijo.</p>`,
+    input: true,
+  });
+  let real = "";
+  if (snap) {
+    if (err) real += `<p><strong>El error:</strong> <code>${escHtml(err.type)}</code>${err.line ? ` en la línea ${err.line}` : ""}${err.msg ? ` — ${escHtml(String(err.msg).slice(0, 160))}` : ""}</p>`;
+    if (snap.stdout) real += `<div class="panel-label" style="margin-top:12px">Lo que alcanzó a imprimir</div><pre>${escHtml(snap.stdout)}</pre>`;
+    if (snap.vars && snap.vars.length) {
+      real += `<div class="panel-label" style="margin-top:12px">Estado real de tus variables</div><div class="dbg-vars">` +
+        snap.vars.map(v => `<div><code>${escHtml(v.name)}</code> = <code>${escHtml(v.value)}</code></div>`).join("") + `</div>`;
+    } else if (!err && !snap.stdout) {
+      real += `<p>El código no dejó variables ni salida para inspeccionar.</p>`;
+    }
+  } else {
+    real += `<p>No pude inspeccionar el estado del código esta vez.</p>`;
+  }
+  real += `<p style="margin-top:12px">Ahora compará contra tu hipótesis: ¿qué valor <strong>no</strong> es el que esperabas? ¿Ves la diferencia? Esa variable señala la línea culpable.</p>`;
+  steps.push({ title: "La realidad", html: real });
+
+  let q;
+  if (err && err.type === "AssertionError") {
+    q = `<p>El test falló con este mensaje:</p><div class="soc-reveal">${escHtml(String(err.msg || "").slice(0, 300)) || "(sin mensaje)"}</div><p>Tu código corre — el problema es <em>qué</em> produce. ¿Qué parte de tu código es responsable de cumplir exactamente eso? Releé la consigna con sospecha: ¿pide lo que implementaste, o algo sutilmente distinto — orden, tipo de dato, redondeo, mayúsculas, espacios?</p>`;
+  } else if (err && DEBUG_QA[err.type]) {
+    q = DEBUG_QA[err.type](String(err.msg || ""));
+  } else {
+    q = `<p>No hay error visible: el problema es de lógica pura. Elegí la variable cuyo valor te sorprendió en el paso anterior y seguila hacia atrás: ¿qué línea le dio ese valor? ¿Con qué datos? ¿Qué asumiste ahí que podría no ser cierto?</p>`;
+  }
+  steps.push({ title: "La pregunta clave", html: q });
+
+  steps.push({
+    title: "El método",
+    html: `<p>Si el bug todavía se esconde, cazalo con el método del print:</p><ol><li>Agregá <code>print()</code> de las variables involucradas justo antes de la línea del problema${err && err.line ? ` (línea ${err.line})` : ""}.</li><li>Ejecutá. ¿Los valores ya están mal ahí? El bug está más arriba: mové el print. ¿Están bien? Está más abajo.</li><li>El bug vive entre el último print “bueno” y el primero “malo”.</li></ol><p>Dos prints bien puestos resuelven el 90% de los misterios. Cerrá esto, probá, y volvé si hace falta.</p>`,
+  });
+  return steps;
+}
+
+async function openDebug(res) {
+  const ov = document.getElementById("debug-overlay");
+  const ex = currentExercise();
+  document.getElementById("dbg-subtitle").textContent = ex ? ex.title : "Playground";
+  document.getElementById("dbg-progress").textContent = "";
+  document.getElementById("dbg-body").innerHTML = "<p>Inspeccionando tu código…</p>";
+  ov.classList.remove("hidden");
+  let snap = null;
+  try { snap = await debugSnapshot(getCode()); } catch (e) { console.warn("No se pudo inspeccionar:", e); }
+  // si el código solo no explota pero Verificar falló, el error vino de los tests (lógica)
+  if (snap && !snap.error && res && res.raw && res.raw.includes("AssertionError")) {
+    const am = String(res.raw).match(/AssertionError:?\s*([^\n]*)/);
+    snap.error = { type: "AssertionError", msg: am ? am[1].trim() : "", line: null };
+  }
+  state.debug = { steps: buildDebugSteps(snap), idx: 0 };
+  renderDebugStep();
+}
+function renderDebugStep() {
+  const { steps, idx } = state.debug;
+  const s = steps[idx];
+  document.getElementById("dbg-progress").textContent = `Paso ${idx + 1} de ${steps.length} — ${s.title}`;
+  document.getElementById("dbg-body").innerHTML = s.html +
+    (s.input ? `<div class="soc-answer-zone" style="margin-top:12px"><textarea placeholder="Tu hipótesis, específica… (nadie la corrige: es para obligarte a pensar)"></textarea></div>` : "");
+  document.getElementById("dbg-next").textContent = idx === steps.length - 1 ? "Cerrar y probar" : "Siguiente";
+  applyHighlights(document.getElementById("dbg-body"));
+}
+function wireDebugButton(res) {
+  const btn = document.getElementById("btn-debug");
+  if (btn) btn.onclick = () => openDebug(res);
+}
+
 /* ---------- acciones ---------- */
 function currentExercise() {
   if (state.playground || inTutorial()) return null;
@@ -1122,6 +1541,7 @@ function setFeedback(html, cls) {
 
 async function doRun() {
   const code = getCode();
+  clearAnalysis();
   setFeedback("Ejecutando…", "fb-info");
   const res = await runPython(code);
   const tutStep = currentTutStep();
@@ -1139,7 +1559,9 @@ async function doRun() {
     if (tutStep) {
       setFeedback(`<strong>Qué acaba de pasar.</strong> ${tutStep.note}`, "fb-info");
     } else {
-      setFeedback("Hubo un error. Leé el mensaje de abajo hacia arriba: la última línea dice <em>qué</em> pasó y las anteriores <em>dónde</em>." + errorHelp(res.error), "fb-fail");
+      setFeedback("Hubo un error. Leé el mensaje de abajo hacia arriba: la última línea dice <em>qué</em> pasó y las anteriores <em>dónde</em>." + errorHelp(res.error) +
+        ` <button class="btn" id="btn-debug" style="margin-top:8px">Depuración guiada</button>`, "fb-fail");
+      wireDebugButton(res);
     }
   }
 }
@@ -1177,10 +1599,16 @@ async function doVerify() {
   const rec = exRecord(ex.id);
   rec.attempts += 1;
   rec.code = code;
+  clearAnalysis();
   setFeedback("Verificando…", "fb-info");
 
   const res = await runPython(code, { withTests: ex.tests });
   document.getElementById("btn-solution").disabled = false;
+
+  // análisis automático de la solución: correctitud + prácticas + eficiencia
+  let analysis = null;
+  try { analysis = await analyzeCode(code); } catch (e) { console.warn("Análisis no disponible:", e); }
+  renderAnalysis(res, analysis);
 
   if (res.ok) {
     rec.status = "done";
@@ -1211,7 +1639,9 @@ async function doVerify() {
       msg += ` Llevás ${rec.attempts} intentos: releé el <strong>Concepto</strong> de arriba, abrí el <strong>modo socrático</strong> o pedí una <strong>pista</strong>.`;
     }
     if (!isAssert) msg += errorHelp(res.error);
+    msg += ` <button class="btn" id="btn-debug" style="margin-top:8px">Depuración guiada</button>`;
     setFeedback(msg, "fb-fail");
+    wireDebugButton(res);
     setExStatus(rec);
   }
 }
@@ -1439,6 +1869,15 @@ document.getElementById("btn-socratic").onclick = openSocratic;
 document.getElementById("soc-show").onclick = socShow;
 document.getElementById("soc-next").onclick = socNext;
 document.getElementById("soc-close").onclick = () => document.getElementById("soc-overlay").classList.add("hidden");
+document.getElementById("dbg-close").onclick = () => document.getElementById("debug-overlay").classList.add("hidden");
+document.getElementById("dbg-next").onclick = () => {
+  if (state.debug.idx >= state.debug.steps.length - 1) {
+    document.getElementById("debug-overlay").classList.add("hidden");
+  } else {
+    state.debug.idx += 1;
+    renderDebugStep();
+  }
+};
 document.getElementById("btn-export").onclick = doExport;
 document.getElementById("btn-import").onclick = () => document.getElementById("import-file").click();
 document.getElementById("import-file").addEventListener("change", (e) => {
