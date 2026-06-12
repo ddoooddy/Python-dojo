@@ -212,17 +212,19 @@
     outline: none; tab-size: 4; white-space: pre;
   }
   #editor:focus { border-color: var(--accent); }
-  /* CodeMirror (si carga, reemplaza al textarea) */
-  .CodeMirror {
+  /* CodeMirror (si carga, reemplaza al textarea). La doble clase le gana
+     en especificidad al CSS por defecto de la librería, que llega después. */
+  .CodeMirror.cm-s-dojo {
     height: 320px; border: 1px solid var(--border-strong); border-radius: 8px;
     background: var(--code-bg); color: var(--text);
     font-family: var(--mono); font-size: 13.5px; line-height: 1.6;
   }
-  .CodeMirror-focused { border-color: var(--accent); }
-  .CodeMirror-gutters { background: var(--code-bg); border-right: 1px solid var(--border); }
-  .CodeMirror-linenumber { color: var(--text-3); font-size: 11.5px; }
-  .CodeMirror-cursor { border-left: 1.5px solid var(--text); }
-  .CodeMirror-selected { background: var(--accent-soft) !important; }
+  .CodeMirror.cm-s-dojo.CodeMirror-focused { border-color: var(--accent); }
+  .cm-s-dojo .CodeMirror-gutters { background: var(--code-bg); border-right: 1px solid var(--border); }
+  .cm-s-dojo .CodeMirror-linenumber { color: var(--text-3); font-size: 11.5px; }
+  .cm-s-dojo .CodeMirror-cursor { border-left: 1.5px solid var(--text); }
+  .cm-s-dojo .CodeMirror-selected { background: var(--accent-soft) !important; }
+  .cm-s-dojo .CodeMirror-line::selection, .cm-s-dojo .CodeMirror-line > span::selection { background: var(--accent-soft); }
   .cm-s-dojo .cm-keyword { color: var(--syn-kw); }
   .cm-s-dojo .cm-string, .cm-s-dojo .cm-string-2 { color: var(--syn-str); }
   .cm-s-dojo .cm-comment { color: var(--syn-com); font-style: italic; }
