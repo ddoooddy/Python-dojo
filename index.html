@@ -1,0 +1,1319 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Python Dojo — Práctica deliberada de Python</title>
+<style>
+  :root {
+    /* Tema oscuro (por defecto) */
+    --bg: #14181d;
+    --surface: #1b2129;
+    --border: #2a313b;
+    --border-strong: #3a434f;
+    --text: #d8dee6;
+    --text-2: #9aa4af;
+    --text-3: #6e7882;
+    --accent: #7daede;
+    --accent-btn: #34638f;
+    --accent-btn-hover: #3f74a6;
+    --accent-soft: rgba(125, 174, 222, .10);
+    --green: #5cb85f;
+    --green-soft: rgba(92, 184, 95, .10);
+    --amber: #c79a3b;
+    --amber-soft: rgba(199, 154, 59, .10);
+    --red: #e0635b;
+    --red-soft: rgba(224, 99, 91, .10);
+    --code-bg: #11151a;
+    --shadow: rgba(0, 0, 0, .5);
+    --syn-kw: #c694e0;
+    --syn-str: #9bc37c;
+    --syn-com: #6e7882;
+    --syn-num: #d19a66;
+    --syn-bi: #7daede;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  body.light {
+    --bg: #f6f6f4;
+    --surface: #ffffff;
+    --border: #e3e3df;
+    --border-strong: #cfcfc9;
+    --text: #1f2328;
+    --text-2: #6b7280;
+    --text-3: #9aa1a9;
+    --accent: #2f5d90;
+    --accent-btn: #2f5d90;
+    --accent-btn-hover: #24496f;
+    --accent-soft: #eef3f8;
+    --green: #1a7f37;
+    --green-soft: #f0f7f1;
+    --amber: #9a6700;
+    --amber-soft: #fbf6ea;
+    --red: #b42318;
+    --red-soft: #fbf1f0;
+    --code-bg: #f6f8fa;
+    --shadow: rgba(31, 35, 40, .18);
+    --syn-kw: #8250df;
+    --syn-str: #1a7f37;
+    --syn-com: #9aa1a9;
+    --syn-num: #953800;
+    --syn-bi: #2f5d90;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: var(--sans); font-size: 15px; line-height: 1.6;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  /* ---------- Header ---------- */
+  header {
+    display: flex; align-items: center; gap: 18px; padding: 14px 28px;
+    background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  header h1 { font-size: 16px; font-weight: 650; letter-spacing: -0.01em; white-space: nowrap; }
+  header h1 span { color: var(--text-3); font-weight: 400; margin-left: 10px; font-size: 13px; }
+  #global-progress { flex: 1; display: flex; align-items: center; gap: 12px; min-width: 0; max-width: 380px; }
+  .progress-bar { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--accent); transition: width .4s; }
+  #progress-label { font-size: 12.5px; color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  #streak-label { font-size: 12.5px; color: var(--text-3); white-space: nowrap; }
+  #py-status { font-size: 12.5px; color: var(--text-3); white-space: nowrap; margin-left: auto; }
+  #py-status.ready { color: var(--green); }
+  #py-status.loading { color: var(--amber); }
+
+  button { font-family: inherit; cursor: pointer; }
+  .btn {
+    background: var(--surface); color: var(--text); border: 1px solid var(--border-strong);
+    border-radius: 6px; padding: 6px 14px; font-size: 13.5px; font-weight: 500;
+    transition: background .12s, border-color .12s;
+  }
+  .btn:hover { background: var(--accent-soft); }
+  .btn-primary { background: var(--accent-btn); border-color: var(--accent-btn); color: #fff; }
+  .btn-primary:hover { background: var(--accent-btn-hover); border-color: var(--accent-btn-hover); }
+  .btn-quiet { background: none; border: none; color: var(--text-2); padding: 6px 10px; font-size: 13.5px; border-radius: 6px; }
+  .btn-quiet:hover { background: var(--accent-soft); color: var(--text); }
+  .btn[disabled], .btn-quiet[disabled] { opacity: .45; cursor: not-allowed; }
+
+  /* ---------- Layout ---------- */
+  #layout { display: flex; flex: 1; min-height: 0; }
+  #sidebar {
+    width: 280px; flex-shrink: 0; overflow-y: auto;
+    background: var(--surface); border-right: 1px solid var(--border); padding: 18px 0 48px;
+  }
+  .level-header {
+    padding: 14px 22px 6px; font-size: 11px; font-weight: 600; cursor: pointer; user-select: none;
+    text-transform: uppercase; letter-spacing: .09em; color: var(--text-2);
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .level-header:hover { color: var(--text); }
+  .level-header .lvl-count { font-size: 11px; letter-spacing: 0; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .topic-item {
+    padding: 7px 22px; font-size: 13.5px; cursor: pointer; color: var(--text-2);
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    border-left: 2px solid transparent;
+  }
+  .topic-item:hover { background: var(--accent-soft); color: var(--text); }
+  .topic-item.active { background: var(--accent-soft); color: var(--accent); border-left-color: var(--accent); font-weight: 550; }
+  .topic-item.is-project { font-style: italic; }
+  .t-prog { font-size: 11.5px; flex-shrink: 0; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .t-prog.done { color: var(--green); }
+  .t-prog.partial { color: var(--amber); }
+  .level-topics.collapsed { display: none; }
+  .sidebar-section {
+    padding: 18px 22px 6px; font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .09em; color: var(--text-2);
+    border-top: 1px solid var(--border); margin-top: 14px;
+  }
+
+  #main { flex: 1; overflow-y: auto; padding: 30px 40px 100px; min-width: 0; }
+  #main-inner { max-width: 1060px; }
+  #breadcrumb { font-size: 11px; text-transform: uppercase; letter-spacing: .09em; color: var(--text-3); margin-bottom: 10px; }
+  #topic-title { font-size: 23px; font-weight: 650; letter-spacing: -0.015em; margin-bottom: 8px; }
+  #topic-intro { color: var(--text-2); font-size: 14.5px; line-height: 1.65; margin-bottom: 16px; max-width: 780px; }
+  code {
+    font-family: var(--mono); font-size: .88em; background: var(--code-bg);
+    border: 1px solid var(--border); padding: 1px 5px; border-radius: 4px; color: var(--text);
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 12px 16px; margin: 10px 0; overflow-x: auto;
+    font-family: var(--mono); font-size: 13px; line-height: 1.55; color: var(--text);
+  }
+  pre code { background: none; border: none; padding: 0; }
+  /* resaltado de sintaxis (bloques estáticos) */
+  .py-kw { color: var(--syn-kw); }
+  .py-str { color: var(--syn-str); }
+  .py-com { color: var(--syn-com); font-style: italic; }
+  .py-num { color: var(--syn-num); }
+  .py-bi { color: var(--syn-bi); }
+
+  /* ---------- Concepto ---------- */
+  #concept-box {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    margin-bottom: 18px; max-width: 880px;
+  }
+  #concept-box summary {
+    list-style: none; cursor: pointer; user-select: none;
+    padding: 13px 24px; font-size: 11px; font-weight: 650;
+    text-transform: uppercase; letter-spacing: .09em; color: var(--accent);
+    display: flex; align-items: center; gap: 8px;
+  }
+  #concept-box summary::-webkit-details-marker { display: none; }
+  #concept-box summary::after { content: "ocultar"; margin-left: auto; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--text-3); font-size: 12px; }
+  #concept-box:not([open]) summary::after { content: "mostrar"; }
+  #concept-box[open] summary { border-bottom: 1px solid var(--border); }
+  #concept-content { padding: 16px 24px 20px; font-size: 14.5px; line-height: 1.75; }
+  #concept-content p + p, #concept-content pre + p, #concept-content p + pre { margin-top: 10px; }
+  #concept-content h4 { margin: 16px 0 6px; font-size: 13.5px; font-weight: 650; color: var(--text); }
+  #concept-content ul, #concept-content ol { padding-left: 22px; margin: 8px 0; }
+  #concept-content li { margin: 4px 0; }
+
+  #topic-actions { margin-bottom: 22px; }
+
+  #ex-chips { display: flex; gap: 6px; margin-bottom: 22px; flex-wrap: wrap; }
+  .chip {
+    min-width: 34px; height: 34px; padding: 0 12px; border-radius: 6px;
+    border: 1px solid var(--border-strong); background: var(--surface);
+    color: var(--text-2); font-size: 13px; font-weight: 550;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+  .chip.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .chip.done { color: var(--green); border-color: var(--green); }
+  .chip.done.active { background: var(--green-soft); }
+
+  .ex-header { display: flex; align-items: baseline; gap: 14px; margin-bottom: 10px; flex-wrap: wrap; }
+  #ex-title { font-size: 17.5px; font-weight: 650; letter-spacing: -0.01em; }
+  #ex-difficulty { color: var(--text-3); font-size: 12.5px; }
+  #ex-status { font-size: 12.5px; font-weight: 550; }
+  #ex-status.done { color: var(--green); }
+  #ex-status.tried { color: var(--amber); }
+
+  #ex-prompt {
+    font-size: 14.5px; line-height: 1.7; margin-bottom: 20px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px;
+  }
+  #ex-prompt p + p, #ex-prompt p + ul, #ex-prompt ul + p, #ex-prompt p + ol, #ex-prompt ol + p { margin-top: 10px; }
+  #ex-prompt ul, #ex-prompt ol { padding-left: 22px; }
+  #ex-prompt li { margin: 3px 0; }
+  .tut-code-label { font-size: 11px; text-transform: uppercase; letter-spacing: .09em; color: var(--text-3); margin-top: 12px; font-weight: 600; }
+
+  /* ---------- Editor + salida ---------- */
+  .panel-label { font-size: 11px; text-transform: uppercase; letter-spacing: .09em; color: var(--text-3); margin-bottom: 6px; font-weight: 600; }
+  #work-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 18px; margin-bottom: 14px; }
+  @media (max-width: 1100px) { #work-grid { grid-template-columns: 1fr; } }
+  #editor {
+    width: 100%; min-height: 320px; resize: vertical; display: block;
+    background: var(--code-bg); color: var(--text); border: 1px solid var(--border-strong); border-radius: 8px;
+    font-family: var(--mono); font-size: 13.5px; line-height: 1.6; padding: 14px 16px;
+    outline: none; tab-size: 4; white-space: pre;
+  }
+  #editor:focus { border-color: var(--accent); }
+  /* CodeMirror (si carga, reemplaza al textarea) */
+  .CodeMirror {
+    height: 320px; border: 1px solid var(--border-strong); border-radius: 8px;
+    background: var(--code-bg); color: var(--text);
+    font-family: var(--mono); font-size: 13.5px; line-height: 1.6;
+  }
+  .CodeMirror-focused { border-color: var(--accent); }
+  .CodeMirror-gutters { background: var(--code-bg); border-right: 1px solid var(--border); }
+  .CodeMirror-linenumber { color: var(--text-3); font-size: 11.5px; }
+  .CodeMirror-cursor { border-left: 1.5px solid var(--text); }
+  .CodeMirror-selected { background: var(--accent-soft) !important; }
+  .cm-s-dojo .cm-keyword { color: var(--syn-kw); }
+  .cm-s-dojo .cm-string, .cm-s-dojo .cm-string-2 { color: var(--syn-str); }
+  .cm-s-dojo .cm-comment { color: var(--syn-com); font-style: italic; }
+  .cm-s-dojo .cm-number { color: var(--syn-num); }
+  .cm-s-dojo .cm-builtin, .cm-s-dojo .cm-def { color: var(--syn-bi); }
+  .cm-s-dojo .cm-variable, .cm-s-dojo .cm-property, .cm-s-dojo .cm-operator { color: var(--text); }
+  .cm-s-dojo .cm-matchingbracket { color: var(--accent) !important; font-weight: 700; background: var(--accent-soft); }
+
+  #output-box {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px 16px; font-family: var(--mono); font-size: 13px; line-height: 1.6;
+    white-space: pre-wrap; word-break: break-word; min-height: 320px; max-height: 480px; overflow-y: auto;
+  }
+  #output-box:empty::before { content: "La salida de tu código aparece acá."; color: var(--text-3); font-style: italic; font-family: var(--sans); }
+  #output-box .err { color: var(--red); }
+
+  #toolbar { display: flex; gap: 10px; margin-bottom: 22px; flex-wrap: wrap; align-items: center; }
+  #toolbar .kbd-hint { margin-left: auto; font-size: 12px; color: var(--text-3); }
+  .kbd-hint kbd {
+    font-family: var(--mono); font-size: 11px; background: var(--surface);
+    border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 4px; padding: 1px 5px;
+  }
+
+  /* ---------- Feedback / pistas / solución ---------- */
+  .fb {
+    border-radius: 6px; padding: 12px 18px; font-size: 14px; line-height: 1.65; margin-bottom: 12px;
+    background: var(--surface); border: 1px solid var(--border); border-left-width: 3px;
+  }
+  .fb strong:first-child { font-weight: 650; }
+  .fb-ok { border-left-color: var(--green); background: var(--green-soft); }
+  .fb-fail { border-left-color: var(--red); background: var(--red-soft); }
+  .fb-info { border-left-color: var(--accent); background: var(--accent-soft); }
+  .fb .btn { margin-left: 12px; padding: 4px 12px; font-size: 12.5px; vertical-align: baseline; }
+  .err-guide {
+    margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
+    font-size: 13.5px; color: var(--text-2);
+  }
+  .err-guide strong { color: var(--text); }
+
+  .hint-box {
+    background: var(--amber-soft); border: 1px solid var(--border); border-left: 3px solid var(--amber);
+    border-radius: 6px; padding: 12px 18px; font-size: 14px; line-height: 1.65; margin-bottom: 10px;
+  }
+  .hint-box strong { color: var(--amber); font-weight: 650; }
+
+  .sol-wrap { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin: 18px 0; background: var(--surface); }
+  .sol-head {
+    padding: 12px 24px; font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .09em; color: var(--text-2);
+    border-bottom: 1px solid var(--border); background: var(--code-bg);
+  }
+  .sol-code { padding: 8px 24px 0; }
+  .sol-expl { padding: 4px 24px 20px; font-size: 14.5px; line-height: 1.7; }
+  .sol-expl h4 { margin: 14px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .09em; color: var(--accent); font-weight: 650; }
+  .sol-expl p + p { margin-top: 8px; }
+
+  /* ---------- Overlays ---------- */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(8, 10, 13, .6); z-index: 50;
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+  }
+  .overlay.hidden { display: none; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    max-width: 660px; width: 100%; max-height: 86vh; overflow-y: auto; padding: 30px 36px;
+    box-shadow: 0 18px 50px var(--shadow);
+  }
+  .modal h2 { font-size: 18px; font-weight: 650; letter-spacing: -0.01em; margin-bottom: 4px; }
+  .modal .modal-sub { font-size: 11px; text-transform: uppercase; letter-spacing: .09em; color: var(--text-3); margin-bottom: 18px; }
+  .modal p { font-size: 14.5px; line-height: 1.7; color: var(--text-2); margin-bottom: 12px; }
+  .modal p strong { color: var(--text); }
+
+  .soc-note { font-size: 12.5px; color: var(--text-3); margin-bottom: 14px; font-style: italic; }
+  .soc-text { font-size: 15px; line-height: 1.7; margin-bottom: 16px; color: var(--text); }
+  .soc-answer-zone textarea {
+    width: 100%; min-height: 72px; background: var(--code-bg); color: var(--text);
+    border: 1px solid var(--border-strong); border-radius: 6px; padding: 10px 14px;
+    font-family: inherit; font-size: 14px; resize: vertical; margin-bottom: 14px; outline: none;
+  }
+  .soc-answer-zone textarea:focus { border-color: var(--accent); }
+  .soc-reveal {
+    background: var(--accent-soft); border: 1px solid var(--border); border-left: 3px solid var(--accent);
+    border-radius: 6px; padding: 14px 18px; font-size: 14px; line-height: 1.7; margin-bottom: 16px;
+  }
+  .soc-buttons { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+  .soc-progress { font-size: 12px; color: var(--text-3); margin-bottom: 12px; font-variant-numeric: tabular-nums; }
+
+  .rev-item {
+    display: block; width: 100%; text-align: left; margin-bottom: 8px;
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 11px 16px; color: var(--text); font-size: 14px;
+  }
+  .rev-item:hover { border-color: var(--accent); }
+  .rev-item small { display: block; color: var(--text-3); margin-top: 2px; font-size: 12px; }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 5px; border: 2px solid var(--bg); }
+  ::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Python Dojo<span>Práctica deliberada de Python</span></h1>
+  <div id="global-progress">
+    <div class="progress-bar"><div class="progress-fill" id="global-fill" style="width:0%"></div></div>
+    <span id="progress-label">0 / 0</span>
+  </div>
+  <span id="streak-label"></span>
+  <span id="py-status">Python sin cargar</span>
+  <button class="btn-quiet" id="btn-review" title="Volver a resolver ejercicios que ya pasaste: la memoria se construye repitiendo">Repaso</button>
+  <button class="btn-quiet" id="btn-theme" title="Alternar tema claro / oscuro">Tema claro</button>
+  <button class="btn-quiet" id="btn-export" title="Descargar tu progreso como archivo JSON">Exportar</button>
+  <button class="btn-quiet" id="btn-import" title="Restaurar progreso desde un archivo JSON">Importar</button>
+  <input type="file" id="import-file" accept=".json" style="display:none">
+</header>
+
+<div id="layout">
+  <nav id="sidebar"></nav>
+  <main id="main">
+    <div id="main-inner">
+      <div id="breadcrumb"></div>
+      <h2 id="topic-title"></h2>
+      <div id="topic-intro"></div>
+      <details id="concept-box" open>
+        <summary>Concepto — leé esto primero</summary>
+        <div id="concept-content"></div>
+      </details>
+      <div id="topic-actions">
+        <button class="btn" id="btn-socratic">Explicame por qué — modo socrático</button>
+      </div>
+      <div id="ex-chips"></div>
+      <div id="exercise-panel">
+        <div class="ex-header">
+          <span id="ex-title"></span>
+          <span id="ex-difficulty"></span>
+          <span id="ex-status"></span>
+        </div>
+        <div id="ex-prompt"></div>
+        <div id="work-grid">
+          <div class="work-col">
+            <div class="panel-label">Editor</div>
+            <textarea id="editor" spellcheck="false"></textarea>
+          </div>
+          <div class="work-col">
+            <div class="panel-label">Salida</div>
+            <div id="output-box"></div>
+          </div>
+        </div>
+        <div id="toolbar">
+          <button class="btn btn-primary" id="btn-verify">Verificar</button>
+          <button class="btn" id="btn-run">Ejecutar</button>
+          <button class="btn-quiet" id="btn-hint">Pista</button>
+          <button class="btn-quiet" id="btn-solution" disabled title="Intentá verificar al menos una vez antes de ver la solución">Ver solución</button>
+          <button class="btn-quiet" id="btn-reset-code">Reiniciar código</button>
+          <button class="btn-quiet" id="btn-tut-prev" style="display:none">Paso anterior</button>
+          <button class="btn btn-primary" id="btn-tut-next" style="display:none">Siguiente paso</button>
+          <span class="kbd-hint"><kbd>⌘/Ctrl</kbd> + <kbd>Enter</kbd> <span id="kbd-action">verifica</span></span>
+        </div>
+        <div id="feedback"></div>
+        <div id="hints-area"></div>
+        <div id="solution-area"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Modo socrático -->
+<div class="overlay hidden" id="soc-overlay">
+  <div class="modal">
+    <h2 id="soc-title">Modo socrático</h2>
+    <div class="modal-sub" id="soc-subtitle"></div>
+    <div class="soc-progress" id="soc-progress"></div>
+    <div class="soc-note">Pensá y escribí tu respuesta antes de revelar — ahí está el aprendizaje.</div>
+    <div class="soc-text" id="soc-question"></div>
+    <div class="soc-answer-zone">
+      <textarea id="soc-user-answer" placeholder="Tu respuesta, con tus palabras (nadie la corrige: es para obligarte a pensar)…"></textarea>
+    </div>
+    <div class="soc-reveal" id="soc-reveal" style="display:none"></div>
+    <div class="soc-buttons">
+      <button class="btn-quiet" id="soc-close">Cerrar</button>
+      <button class="btn btn-primary" id="soc-show">Mostrar respuesta</button>
+      <button class="btn" id="soc-next" style="display:none">Siguiente</button>
+    </div>
+  </div>
+</div>
+
+<!-- Repaso -->
+<div class="overlay hidden" id="review-overlay">
+  <div class="modal">
+    <h2>Repaso espaciado</h2>
+    <div class="modal-sub">Resolver de nuevo fija el conocimiento</div>
+    <p>Estos son tus ejercicios resueltos hace más tiempo — los mejores candidatos a repaso. Entrá a uno, tocá <strong>Reiniciar código</strong> y resolvelo sin mirar la solución. Si sale solo, el concepto es tuyo; si no, su tema te espera con el Concepto y el modo socrático.</p>
+    <div id="review-list"></div>
+    <div class="soc-buttons" style="margin-top:14px">
+      <button class="btn-quiet" id="review-close">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bienvenida -->
+<div class="overlay hidden" id="welcome-overlay">
+  <div class="modal">
+    <h2>Python Dojo</h2>
+    <div class="modal-sub">Práctica deliberada, método socrático</div>
+    <p>Acá se aprende <strong>resolviendo</strong>, sin adivinar nada: cada tema arranca con una sección <strong>Concepto</strong> que explica todo desde cero, sigue con un <strong>tutorial interactivo</strong> donde ejecutás código y ves qué pasa, y recién entonces vienen los ejercicios. La solución aparece después de que intentás, con su porqué.</p>
+    <p>El código Python corre de verdad en tu navegador y el progreso se guarda solo. Para experimentar libre tenés el <strong>Playground</strong> (abajo a la izquierda); para fijar lo aprendido, el botón <strong>Repaso</strong> de arriba. Punto de partida recomendado: <strong>Básico → Variables y tipos</strong>.</p>
+    <p style="margin-top:18px"><button class="btn btn-primary" id="welcome-start">Comenzar</button></p>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   Registro de contenido (DOJO_PUSH / DOJO_EXTEND)
+   ============================================================ */
+window.DOJO_TOPICS = {};
+window.DOJO_PUSH = function (levelId, topics) {
+  if (!window.DOJO_TOPICS[levelId]) window.DOJO_TOPICS[levelId] = [];
+  window.DOJO_TOPICS[levelId].push(...topics);
+};
+window.DOJO_EXTEND = function (levelId, topicId, extra) {
+  const t = (window.DOJO_TOPICS[levelId] || []).find(t => t.id === topicId);
+  if (t) Object.assign(t, extra);
+  else console.warn("DOJO_EXTEND: no existe el tema", levelId, topicId);
+};
+
+const LEVELS = [
+  { id: "basico",     title: "Básico" },
+  { id: "intermedio", title: "Intermedio" },
+  { id: "avanzado",   title: "Avanzado" },
+  { id: "numpy",      title: "NumPy" },
+  { id: "ml",         title: "Intro a ML" },
+];
+</script>
+
+<script src="content/basico1.js"></script>
+<script src="content/basico2.js"></script>
+<script src="content/intermedio.js"></script>
+<script src="content/avanzado.js"></script>
+<script src="content/numpy.js"></script>
+<script src="content/ml.js"></script>
+<script src="content/conceptos-basico.js"></script>
+<script src="content/conceptos-intermedio-avanzado.js"></script>
+<script src="content/conceptos-numpy-ml.js"></script>
+
+<script>
+/* ============================================================
+   Motor del Dojo
+   ============================================================ */
+const STORAGE_KEY = "python-dojo-v1";
+
+const state = {
+  progress: { exercises: {}, tutorials: {}, days: {}, lastTopic: null, welcomed: false, theme: "dark", playgroundCode: null },
+  currentLevel: null,
+  currentTopic: null,
+  currentEx: 0,          // -1 = tutorial del tema
+  tutStep: 0,
+  hintsShown: 0,
+  playground: false,
+  soc: { steps: [], idx: 0 },
+  pyodide: null,
+  pyLoading: null,
+  numpyLoaded: false,
+};
+
+function loadProgress() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) state.progress = Object.assign(state.progress, JSON.parse(raw));
+    if (!state.progress.tutorials) state.progress.tutorials = {};
+    if (!state.progress.days) state.progress.days = {};
+  } catch (e) { console.warn("No se pudo leer el progreso:", e); }
+}
+function saveProgress() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress)); }
+function exRecord(id) {
+  if (!state.progress.exercises[id]) state.progress.exercises[id] = { status: "none", attempts: 0, code: null };
+  return state.progress.exercises[id];
+}
+
+/* ---------- editor: abstracción textarea / CodeMirror ---------- */
+const editorTA = document.getElementById("editor");
+let cmEditor = null;
+function getCode() { return cmEditor ? cmEditor.getValue() : editorTA.value; }
+function setCode(v) { if (cmEditor) { cmEditor.setValue(v); cmEditor.clearHistory(); } else { editorTA.value = v; } }
+
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    const s = document.createElement("script");
+    s.src = src; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+async function initCodeMirror() {
+  const base = "https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/";
+  try {
+    const link = document.createElement("link");
+    link.rel = "stylesheet"; link.href = base + "codemirror.min.css";
+    document.head.appendChild(link);
+    await loadScript(base + "codemirror.min.js");
+    await Promise.all([
+      loadScript(base + "mode/python/python.min.js"),
+      loadScript(base + "addon/edit/matchbrackets.min.js"),
+      loadScript(base + "addon/edit/closebrackets.min.js"),
+    ]);
+    cmEditor = CodeMirror.fromTextArea(editorTA, {
+      mode: "python",
+      theme: "dojo",
+      lineNumbers: true,
+      indentUnit: 4,
+      indentWithTabs: false,
+      matchBrackets: true,
+      autoCloseBrackets: true,
+      extraKeys: {
+        "Cmd-Enter": () => doVerify(),
+        "Ctrl-Enter": () => doVerify(),
+        "Tab": (cm) => cm.somethingSelected() ? cm.indentSelection("add") : cm.execCommand("insertSoftTab"),
+      },
+    });
+    cmEditor.on("change", scheduleAutosave);
+  } catch (e) {
+    console.warn("CodeMirror no disponible (sin conexión?): se usa el editor simple.", e);
+    cmEditor = null;
+  }
+}
+
+/* ---------- resaltado de sintaxis para bloques estáticos ---------- */
+const PY_TOKEN_RE = new RegExp(
+  "(#[^\\n]*)" +
+  "|(\"\"\"[\\s\\S]*?\"\"\"|'''[\\s\\S]*?''')" +
+  "|((?:[fFrRbB]{1,2})?\"(?:\\\\.|[^\"\\\\\\n])*\"|(?:[fFrRbB]{1,2})?'(?:\\\\.|[^'\\\\\\n])*')" +
+  "|\\b(def|class|return|if|elif|else|for|while|in|not|and|or|import|from|as|with|try|except|finally|raise|yield|lambda|pass|break|continue|global|nonlocal|del|assert|is|None|True|False)\\b" +
+  "|\\b(print|len|range|type|int|float|str|bool|list|dict|set|tuple|sum|max|min|sorted|reversed|enumerate|zip|abs|round|open|isinstance|input|next|iter|map|filter|super|self|repr|hasattr|getattr|callable|exec|eval)\\b" +
+  "|\\b(\\d+\\.?\\d*(?:e[+-]?\\d+)?)\\b",
+  "g"
+);
+function hlPython(raw) {
+  const esc = raw.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return esc.replace(PY_TOKEN_RE, (m, com, tstr, str, kw, bi, num) => {
+    if (com) return `<span class="py-com">${m}</span>`;
+    if (tstr || str) return `<span class="py-str">${m}</span>`;
+    if (kw) return `<span class="py-kw">${m}</span>`;
+    if (bi) return `<span class="py-bi">${m}</span>`;
+    if (num) return `<span class="py-num">${m}</span>`;
+    return m;
+  });
+}
+function applyHighlights(container) {
+  if (!container) return;
+  container.querySelectorAll("pre").forEach(pre => {
+    const target = pre.querySelector("code") || pre;
+    target.innerHTML = hlPython(target.textContent);
+  });
+}
+
+/* ---------- guía de errores en español ---------- */
+const ERROR_GUIDE = {
+  SyntaxError: "Python no pudo ni empezar a ejecutar: hay algo mal escrito. Los sospechosos de siempre: paréntesis o comillas sin cerrar, dos puntos (:) que faltan al final de un if/for/def, o un = donde iba un ==.",
+  IndentationError: "El problema es la sangría (los espacios al inicio de las líneas). En Python la indentación ES la estructura: revisá que los bloques dentro de if/for/def tengan sus 4 espacios, y que no haya espacios de más.",
+  NameError: "Usaste un nombre que no existe en ese momento: o está mal escrito (mayúsculas importan), o la variable/función se usa antes de crearse.",
+  TypeError: "Operación entre tipos incompatibles: sumar texto con número, llamar algo que no es una función, modificar una tupla… Revisá de qué tipo es cada cosa involucrada (print(type(x)) ayuda).",
+  ValueError: "El tipo era correcto pero el valor no sirve: int(\"hola\") es el ejemplo clásico. El dato no tiene la forma que la operación espera.",
+  IndexError: "Pediste una posición que no existe: en una lista de 3 elementos, las posiciones válidas son 0, 1 y 2. Acordate de que se cuenta desde cero.",
+  KeyError: "Pediste una clave que no está en el diccionario. Verificá la ortografía exacta de la clave, o usá .get(clave, default) cuando pueda faltar.",
+  ZeroDivisionError: "División por cero: matemáticamente indefinida. Suele venir de un denominador que quedó en 0 (una lista vacía en un promedio, por ejemplo) — protegelo con un if o un try.",
+  AttributeError: "Le pediste a un valor algo que no tiene: un método inexistente (¿typo?) o — el caso más común — la variable vale None sin que lo esperaras (una función que no retornó, quizás).",
+  UnboundLocalError: "Una variable se usa dentro de una función antes de asignarla ahí. Si querías usar una de afuera, asignala primero o pasala como parámetro.",
+  ModuleNotFoundError: "Ese módulo no existe o el nombre está mal escrito. Acá adentro tenés la librería estándar y numpy; otras librerías externas no están disponibles.",
+  RecursionError: "Una función se llamó a sí misma demasiadas veces sin frenar: a la recursión le falta su caso base (la condición que corta la cadena).",
+  StopIteration: "Se le pidió un valor a un generador/iterador que ya no tiene más para dar.",
+  FileNotFoundError: "Se intentó abrir un archivo que no existe (en modo lectura). ¿Lo escribiste antes en este mismo código? ¿El nombre coincide exacto?",
+};
+function errorHelp(errText) {
+  const matches = String(errText).match(/[A-Z][A-Za-z]*Error|StopIteration/g);
+  if (!matches) return "";
+  const last = matches[matches.length - 1];
+  const guide = ERROR_GUIDE[last];
+  if (!guide) return "";
+  return `<div class="err-guide"><strong>${last} — qué suele significar.</strong> ${guide}</div>`;
+}
+
+/* ---------- tema ---------- */
+function applyTheme() {
+  document.body.classList.toggle("light", state.progress.theme === "light");
+  document.getElementById("btn-theme").textContent = state.progress.theme === "light" ? "Tema oscuro" : "Tema claro";
+  if (cmEditor) cmEditor.refresh();
+}
+
+/* ---------- racha ---------- */
+function todayKey(d) { return d.toISOString().slice(0, 10); }
+function computeStreak() {
+  const days = state.progress.days || {};
+  const d = new Date();
+  if (!days[todayKey(d)]) d.setDate(d.getDate() - 1);   // la racha sobrevive si hoy todavía no practicaste
+  let s = 0;
+  while (days[todayKey(d)]) { s++; d.setDate(d.getDate() - 1); }
+  return s;
+}
+function renderStreak() {
+  const s = computeStreak();
+  document.getElementById("streak-label").textContent = s >= 1 ? `Racha: ${s} ${s === 1 ? "día" : "días"}` : "";
+}
+
+/* ---------- helpers de contenido ---------- */
+function topicsOf(levelId) { return window.DOJO_TOPICS[levelId] || []; }
+function allExercises() {
+  const out = [];
+  for (const lvl of LEVELS) for (const t of topicsOf(lvl.id)) for (const ex of t.exercises) out.push(ex);
+  return out;
+}
+function findTopic(levelId, topicId) { return topicsOf(levelId).find(t => t.id === topicId); }
+function inTutorial() { return !state.playground && state.currentEx === -1; }
+
+function exerciseIndex() {
+  // id de ejercicio -> ubicación, para Repaso y navegación
+  const map = {};
+  for (const lvl of LEVELS) for (const t of topicsOf(lvl.id)) t.exercises.forEach((ex, i) => {
+    map[ex.id] = { levelId: lvl.id, levelTitle: lvl.title, topicId: t.id, topicTitle: t.title, exIdx: i, title: ex.title };
+  });
+  return map;
+}
+
+/* ---------- render: sidebar ---------- */
+function renderSidebar() {
+  const sb = document.getElementById("sidebar");
+  sb.innerHTML = "";
+  for (const lvl of LEVELS) {
+    const topics = topicsOf(lvl.id);
+    const done = topics.reduce((n, t) => n + t.exercises.filter(e => exRecord(e.id).status === "done").length, 0);
+    const total = topics.reduce((n, t) => n + t.exercises.length, 0);
+
+    const head = document.createElement("div");
+    head.className = "level-header";
+    head.innerHTML = `<span>${lvl.title}</span><span class="lvl-count">${done}/${total}</span>`;
+    const wrap = document.createElement("div");
+    wrap.className = "level-topics";
+    if ((state.currentLevel && state.currentLevel !== lvl.id) || state.playground) wrap.classList.add("collapsed");
+    head.onclick = () => wrap.classList.toggle("collapsed");
+    sb.appendChild(head);
+
+    for (const t of topics) {
+      const tDone = t.exercises.filter(e => exRecord(e.id).status === "done").length;
+      const el = document.createElement("div");
+      el.className = "topic-item" + (t.isProject ? " is-project" : "");
+      if (!state.playground && state.currentLevel === lvl.id && state.currentTopic === t.id) el.classList.add("active");
+      const cls = tDone === t.exercises.length ? "done" : (tDone > 0 ? "partial" : "");
+      const label = tDone === t.exercises.length ? "✓ " + tDone + "/" + t.exercises.length : tDone + "/" + t.exercises.length;
+      el.innerHTML = `<span>${t.title}</span><span class="t-prog ${cls}">${label}</span>`;
+      el.onclick = () => openTopic(lvl.id, t.id, null);
+      wrap.appendChild(el);
+    }
+    sb.appendChild(wrap);
+  }
+
+  // sección herramientas
+  const sec = document.createElement("div");
+  sec.className = "sidebar-section";
+  sec.textContent = "Herramientas";
+  sb.appendChild(sec);
+  const pg = document.createElement("div");
+  pg.className = "topic-item" + (state.playground ? " active" : "");
+  pg.innerHTML = `<span>Playground</span><span class="t-prog">libre</span>`;
+  pg.onclick = openPlayground;
+  sb.appendChild(pg);
+
+  const all = allExercises();
+  const done = all.filter(e => exRecord(e.id).status === "done").length;
+  document.getElementById("global-fill").style.width = all.length ? (100 * done / all.length) + "%" : "0%";
+  document.getElementById("progress-label").textContent = `${done} / ${all.length} ejercicios`;
+  renderStreak();
+}
+
+/* ---------- render: tema / tutorial / ejercicio / playground ---------- */
+function openTopic(levelId, topicId, exIdx) {
+  state.playground = false;
+  state.currentLevel = levelId;
+  state.currentTopic = topicId;
+  const t = findTopic(levelId, topicId);
+  if (exIdx === null || exIdx === undefined) {
+    exIdx = (t && t.tutorial && !state.progress.tutorials[topicId]) ? -1 : 0;
+  }
+  state.currentEx = exIdx;
+  state.tutStep = 0;
+  state.progress.lastTopic = { levelId, topicId, exIdx: state.currentEx };
+  saveProgress();
+  renderSidebar();
+  renderTopic();
+  document.getElementById("main").scrollTop = 0;
+}
+
+function renderTopic() {
+  const lvl = LEVELS.find(l => l.id === state.currentLevel);
+  const t = findTopic(state.currentLevel, state.currentTopic);
+  if (!t) return;
+  document.getElementById("breadcrumb").textContent = `${lvl.title} · ${t.title}`;
+  document.getElementById("topic-title").textContent = t.title;
+  document.getElementById("topic-intro").innerHTML = t.intro || "";
+  document.getElementById("btn-socratic").style.display = (t.socratic && t.socratic.length) ? "" : "none";
+
+  const cbox = document.getElementById("concept-box");
+  if (t.concept) {
+    cbox.style.display = "";
+    document.getElementById("concept-content").innerHTML = t.concept;
+    applyHighlights(document.getElementById("concept-content"));
+  } else {
+    cbox.style.display = "none";
+  }
+
+  const chips = document.getElementById("ex-chips");
+  chips.innerHTML = "";
+  if (t.tutorial && t.tutorial.length) {
+    const c = document.createElement("button");
+    c.className = "chip";
+    if (state.progress.tutorials[t.id]) c.classList.add("done");
+    if (inTutorial()) c.classList.add("active");
+    c.textContent = state.progress.tutorials[t.id] ? "Tutorial ✓" : "Tutorial";
+    c.title = "Tutorial interactivo: probá el concepto antes de los ejercicios";
+    c.onclick = () => { state.currentEx = -1; state.tutStep = 0; renderTopic(); };
+    chips.appendChild(c);
+  }
+  t.exercises.forEach((ex, i) => {
+    const c = document.createElement("button");
+    c.className = "chip";
+    const rec = exRecord(ex.id);
+    if (rec.status === "done") c.classList.add("done");
+    if (i === state.currentEx) c.classList.add("active");
+    const base = t.isProject ? "Proyecto" : String(i + 1);
+    c.textContent = rec.status === "done" ? (t.isProject ? "Proyecto ✓" : "✓") : base;
+    c.title = ex.title;
+    c.onclick = () => { state.currentEx = i; renderTopic(); };
+    chips.appendChild(c);
+  });
+
+  if (inTutorial()) renderTutorial();
+  else renderExercise();
+}
+
+function setToolbarMode(mode) {
+  const ex = mode === "exercise";
+  const tut = mode === "tutorial";
+  document.getElementById("btn-verify").style.display = ex ? "" : "none";
+  document.getElementById("btn-hint").style.display = ex ? "" : "none";
+  document.getElementById("btn-solution").style.display = ex ? "" : "none";
+  document.getElementById("btn-reset-code").style.display = ex ? "" : "none";
+  document.getElementById("btn-tut-prev").style.display = tut ? "" : "none";
+  document.getElementById("btn-tut-next").style.display = tut ? "" : "none";
+  document.getElementById("kbd-action").textContent = ex ? "verifica" : "ejecuta";
+}
+
+function renderTutorial() {
+  const t = findTopic(state.currentLevel, state.currentTopic);
+  const steps = t.tutorial || [];
+  const i = Math.min(state.tutStep, steps.length - 1);
+  const step = steps[i];
+  if (!step) return;
+  setToolbarMode("tutorial");
+
+  document.getElementById("ex-title").textContent = "Tutorial interactivo";
+  document.getElementById("ex-difficulty").textContent = `Paso ${i + 1} de ${steps.length}`;
+  const st = document.getElementById("ex-status");
+  st.textContent = state.progress.tutorials[t.id] ? "Completado" : "";
+  st.className = state.progress.tutorials[t.id] ? "done" : "";
+
+  const prompt = document.getElementById("ex-prompt");
+  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  prompt.innerHTML =
+    step.text +
+    `<div class="tut-code-label">Escribí (o ajustá) esto en el editor y ejecutalo</div>` +
+    `<pre><code>${esc(step.code)}</code></pre>` +
+    `<p style="color:var(--text-3); font-size:13px">El editor ya lo tiene cargado: tocá <strong>Ejecutar</strong>, mirá la salida, y después modificá el código y volvé a ejecutar — romper cosas acá es gratis y educativo.</p>`;
+  applyHighlights(prompt);
+
+  setCode(step.code);
+  document.getElementById("output-box").textContent = "";
+  document.getElementById("feedback").innerHTML = "";
+  document.getElementById("hints-area").innerHTML = "";
+  document.getElementById("solution-area").innerHTML = "";
+
+  document.getElementById("btn-tut-prev").disabled = i === 0;
+  document.getElementById("btn-tut-next").textContent = (i === steps.length - 1) ? "Ir a los ejercicios" : "Siguiente paso";
+}
+
+function tutNext() {
+  const t = findTopic(state.currentLevel, state.currentTopic);
+  const steps = t.tutorial || [];
+  if (state.tutStep >= steps.length - 1) {
+    state.progress.tutorials[t.id] = true;
+    saveProgress();
+    state.currentEx = 0;
+    renderTopic();
+    document.getElementById("main").scrollTop = 0;
+  } else {
+    state.tutStep += 1;
+    renderTutorial();
+  }
+}
+function tutPrev() { if (state.tutStep > 0) { state.tutStep -= 1; renderTutorial(); } }
+
+function renderExercise() {
+  const t = findTopic(state.currentLevel, state.currentTopic);
+  const ex = t.exercises[state.currentEx];
+  const rec = exRecord(ex.id);
+  state.hintsShown = 0;
+  setToolbarMode("exercise");
+
+  document.getElementById("ex-title").textContent = ex.title;
+  document.getElementById("ex-difficulty").textContent = `Dificultad ${ex.difficulty}/5`;
+  setExStatus(rec);
+  const prompt = document.getElementById("ex-prompt");
+  prompt.innerHTML = ex.prompt;
+  applyHighlights(prompt);
+  setCode(rec.code != null ? rec.code : ex.starter);
+  document.getElementById("output-box").textContent = "";
+  document.getElementById("feedback").innerHTML = "";
+  document.getElementById("hints-area").innerHTML = "";
+  document.getElementById("solution-area").innerHTML = "";
+  document.getElementById("btn-hint").style.display = (ex.hints && ex.hints.length) ? "" : "none";
+
+  const solBtn = document.getElementById("btn-solution");
+  solBtn.disabled = !(rec.attempts > 0 || rec.status === "done");
+  if (rec.status === "done") showSolution(true);
+}
+
+function setExStatus(rec) {
+  const el = document.getElementById("ex-status");
+  if (rec.status === "done") { el.textContent = "Resuelto"; el.className = "done"; }
+  else if (rec.status === "tried") { el.textContent = `${rec.attempts} intento(s)`; el.className = "tried"; }
+  else { el.textContent = ""; el.className = ""; }
+}
+
+const PLAYGROUND_SAMPLE = '# Playground: experimenta libre, nada se evalua.\n# numpy esta disponible: import numpy as np\n\nfor n in range(1, 6):\n    print(n, "al cuadrado es", n * n)\n';
+
+function openPlayground() {
+  state.playground = true;
+  state.currentEx = 0;
+  renderSidebar();
+  document.getElementById("breadcrumb").textContent = "Herramientas · Sandbox";
+  document.getElementById("topic-title").textContent = "Playground";
+  document.getElementById("topic-intro").innerHTML = "Un espacio sin consignas ni tests: escribí lo que quieras y ejecutalo. Acá se prueba esa duda de \"¿qué pasa si…?\" que te quedó dando vueltas en cualquier tema.";
+  document.getElementById("concept-box").style.display = "none";
+  document.getElementById("btn-socratic").style.display = "none";
+  document.getElementById("ex-chips").innerHTML = "";
+  document.getElementById("ex-title").textContent = "Código libre";
+  document.getElementById("ex-difficulty").textContent = "";
+  const st = document.getElementById("ex-status"); st.textContent = ""; st.className = "";
+  const prompt = document.getElementById("ex-prompt");
+  prompt.innerHTML = "<p>Tu código se guarda solo entre sesiones. Ideas: verificá una sospecha de un Concepto, escribí una variante de un ejercicio que ya resolviste, o rompé algo a propósito para conocer el error.</p>";
+  setToolbarMode("playground");
+  setCode(state.progress.playgroundCode || PLAYGROUND_SAMPLE);
+  document.getElementById("output-box").textContent = "";
+  document.getElementById("feedback").innerHTML = "";
+  document.getElementById("hints-area").innerHTML = "";
+  document.getElementById("solution-area").innerHTML = "";
+  document.getElementById("main").scrollTop = 0;
+}
+
+/* ---------- Pyodide ---------- */
+async function ensurePyodide() {
+  if (state.pyodide) return state.pyodide;
+  if (state.pyLoading) return state.pyLoading;
+  const status = document.getElementById("py-status");
+  status.textContent = "Cargando Python (solo la primera vez tarda)";
+  status.className = "loading";
+  state.pyLoading = (async () => {
+    if (!window.loadPyodide) {
+      await new Promise((res, rej) => {
+        const s = document.createElement("script");
+        s.src = "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js";
+        s.onload = res; s.onerror = () => rej(new Error("No se pudo descargar Pyodide. Revisá tu conexión."));
+        document.head.appendChild(s);
+      });
+    }
+    const py = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/" });
+    py.runPython(`
+import builtins
+def _no_input(prompt=""):
+    raise RuntimeError("input() no funciona en esta herramienta: defini los valores como variables en el codigo.")
+builtins.input = _no_input
+`);
+    state.pyodide = py;
+    status.textContent = "Python listo";
+    status.className = "ready";
+    return py;
+  })();
+  state.pyLoading.catch(() => {
+    status.textContent = "Error al cargar Python";
+    status.className = "";
+    state.pyLoading = null;
+  });
+  return state.pyLoading;
+}
+
+async function ensureNumpy(py) {
+  if (state.numpyLoaded) return;
+  const status = document.getElementById("py-status");
+  status.textContent = "Cargando NumPy";
+  status.className = "loading";
+  await py.loadPackage("numpy");
+  state.numpyLoaded = true;
+  status.textContent = "Python + NumPy listo";
+  status.className = "ready";
+}
+
+function cleanTraceback(msg) {
+  const lines = String(msg).split("\n");
+  const idx = lines.findIndex(l => l.includes('File "<exec>"'));
+  const useful = idx >= 0 ? lines.slice(idx) : lines.slice(-6);
+  return useful.join("\n").replace(/File "<exec>", /g, "").trim();
+}
+
+async function runPython(code, { withTests = null } = {}) {
+  const py = await ensurePyodide();
+  const needsNumpy = state.currentLevel === "numpy" || state.currentLevel === "ml"
+    || (state.playground && /\bnumpy\b/.test(code));
+  if (needsNumpy) await ensureNumpy(py);
+
+  py.runPython(`
+import sys
+for _name, _mod in list(sys.modules.items()):
+    _f = getattr(_mod, "__file__", "") or ""
+    if _f.startswith("/home/pyodide"):
+        del sys.modules[_name]
+`);
+
+  let captured = "";
+  py.setStdout({ batched: (s) => { captured += s + "\n"; } });
+  py.setStderr({ batched: (s) => { captured += s + "\n"; } });
+
+  const ns = py.globals.get("dict")();
+  try {
+    await py.runPythonAsync(code, { globals: ns });
+    if (withTests) {
+      ns.set("_stdout", captured);
+      await py.runPythonAsync(withTests, { globals: ns });
+    }
+    return { ok: true, output: captured };
+  } catch (err) {
+    return { ok: false, output: captured, error: cleanTraceback(err.message), raw: err.message };
+  } finally {
+    ns.destroy();
+    py.setStdout({}); py.setStderr({});
+  }
+}
+
+/* ---------- acciones ---------- */
+function currentExercise() {
+  if (state.playground || inTutorial()) return null;
+  const t = findTopic(state.currentLevel, state.currentTopic);
+  return t ? t.exercises[state.currentEx] : null;
+}
+function currentTutStep() {
+  if (!inTutorial()) return null;
+  const t = findTopic(state.currentLevel, state.currentTopic);
+  return t && t.tutorial ? t.tutorial[Math.min(state.tutStep, t.tutorial.length - 1)] : null;
+}
+
+function setOutput(text, isErr) {
+  const box = document.getElementById("output-box");
+  box.innerHTML = "";
+  if (!text) return;
+  const span = document.createElement("span");
+  if (isErr) span.className = "err";
+  span.textContent = text;
+  box.appendChild(span);
+}
+function setFeedback(html, cls) {
+  document.getElementById("feedback").innerHTML = `<div class="fb ${cls}">${html}</div>`;
+}
+
+async function doRun() {
+  const code = getCode();
+  setFeedback("Ejecutando…", "fb-info");
+  const res = await runPython(code);
+  const tutStep = currentTutStep();
+  if (res.ok) {
+    setOutput(res.output || "(el código corrió sin imprimir nada)");
+    if (tutStep) {
+      setFeedback(`<strong>Qué acaba de pasar.</strong> ${tutStep.note}`, "fb-info");
+    } else if (state.playground) {
+      setFeedback("Ejecutado. Editá y volvé a correr cuantas veces quieras.", "fb-info");
+    } else {
+      setFeedback("El código corrió sin errores. Cuando creas que resuelve el problema, usá <strong>Verificar</strong>.", "fb-info");
+    }
+  } else {
+    setOutput((res.output ? res.output + "\n" : "") + res.error, true);
+    if (tutStep) {
+      setFeedback(`<strong>Qué acaba de pasar.</strong> ${tutStep.note}`, "fb-info");
+    } else {
+      setFeedback("Hubo un error. Leé el mensaje de abajo hacia arriba: la última línea dice <em>qué</em> pasó y las anteriores <em>dónde</em>." + errorHelp(res.error), "fb-fail");
+    }
+  }
+}
+
+function nextTarget() {
+  const t = findTopic(state.currentLevel, state.currentTopic);
+  if (state.currentEx + 1 < t.exercises.length) {
+    return { label: "Siguiente ejercicio", go: () => { state.currentEx += 1; renderTopic(); document.getElementById("main").scrollTop = 0; } };
+  }
+  const topics = topicsOf(state.currentLevel);
+  const ti = topics.findIndex(x => x.id === t.id);
+  if (ti + 1 < topics.length) {
+    const nt = topics[ti + 1];
+    return { label: "Siguiente tema: " + nt.title, go: () => openTopic(state.currentLevel, nt.id, null) };
+  }
+  const li = LEVELS.findIndex(l => l.id === state.currentLevel);
+  if (li + 1 < LEVELS.length) {
+    const nl = LEVELS[li + 1];
+    const first = topicsOf(nl.id)[0];
+    if (first) return { label: "Siguiente nivel: " + nl.title, go: () => openTopic(nl.id, first.id, null) };
+  }
+  return null;
+}
+
+async function doVerify() {
+  if (state.playground || inTutorial()) { doRun(); return; }
+  const ex = currentExercise();
+  if (!ex) return;
+  const code = getCode();
+  const rec = exRecord(ex.id);
+  rec.attempts += 1;
+  rec.code = code;
+  setFeedback("Verificando…", "fb-info");
+
+  const res = await runPython(code, { withTests: ex.tests });
+  document.getElementById("btn-solution").disabled = false;
+
+  if (res.ok) {
+    rec.status = "done";
+    state.progress.days[todayKey(new Date())] = true;
+    saveProgress();
+    setOutput(res.output || "");
+    const nt = nextTarget();
+    const nextBtn = nt ? `<button class="btn" id="btn-next-ex">${nt.label}</button>` : " Completaste el último ejercicio del dojo.";
+    setFeedback("<strong>Correcto.</strong> Todos los tests pasaron. Abajo tenés la solución de referencia y el porqué — compará tu enfoque con ese." + nextBtn, "fb-ok");
+    if (nt) document.getElementById("btn-next-ex").onclick = nt.go;
+    showSolution(true);
+    renderSidebar();
+    renderChipsOnly();
+  } else {
+    if (rec.status !== "done") rec.status = "tried";
+    saveProgress();
+    setOutput((res.output ? res.output + "\n" : "") + res.error, true);
+    const isAssert = res.raw && res.raw.includes("AssertionError");
+    let msg = isAssert
+      ? "<strong>Todavía no.</strong> El código corre, pero no hace lo que pide el problema: el mensaje de la salida indica exactamente qué test falló."
+      : "<strong>Error de ejecución.</strong> El código falló antes de llegar a los tests.";
+    if (rec.attempts >= 2) {
+      msg += ` Llevás ${rec.attempts} intentos: releé el <strong>Concepto</strong> de arriba, abrí el <strong>modo socrático</strong> o pedí una <strong>pista</strong>.`;
+    }
+    if (!isAssert) msg += errorHelp(res.error);
+    setFeedback(msg, "fb-fail");
+    setExStatus(rec);
+  }
+}
+
+function renderChipsOnly() {
+  const t = findTopic(state.currentLevel, state.currentTopic);
+  const chips = document.getElementById("ex-chips").children;
+  const offset = (t.tutorial && t.tutorial.length) ? 1 : 0;
+  t.exercises.forEach((ex, i) => {
+    const rec = exRecord(ex.id);
+    const chip = chips[i + offset];
+    if (rec.status === "done" && chip) {
+      chip.classList.add("done");
+      chip.textContent = t.isProject ? "Proyecto ✓" : "✓";
+    }
+  });
+  setExStatus(exRecord(t.exercises[state.currentEx].id));
+}
+
+function doHint() {
+  const ex = currentExercise();
+  if (!ex || !ex.hints || !ex.hints.length) return;
+  if (state.hintsShown >= ex.hints.length) return;
+  const area = document.getElementById("hints-area");
+  const div = document.createElement("div");
+  div.className = "hint-box";
+  div.innerHTML = `<strong>Pista ${state.hintsShown + 1}.</strong> ${ex.hints[state.hintsShown]}`;
+  area.appendChild(div);
+  state.hintsShown += 1;
+}
+
+function showSolution(allowAuto) {
+  const ex = currentExercise();
+  if (!ex) return;
+  const rec = exRecord(ex.id);
+  if (!allowAuto && rec.attempts === 0 && rec.status !== "done") return;
+  const area = document.getElementById("solution-area");
+  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  area.innerHTML = `
+    <div class="sol-wrap">
+      <div class="sol-head">Solución de referencia</div>
+      <div class="sol-code"><pre><code>${esc(ex.solution)}</code></pre></div>
+      <div class="sol-expl"><h4>Por qué así</h4>${ex.explanation}</div>
+    </div>`;
+  applyHighlights(area);
+}
+
+/* ---------- modo socrático ---------- */
+function openSocratic() {
+  const t = findTopic(state.currentLevel, state.currentTopic);
+  if (!t || !t.socratic || !t.socratic.length) return;
+  state.soc = { steps: t.socratic, idx: 0 };
+  document.getElementById("soc-subtitle").textContent = t.title;
+  renderSocStep();
+  document.getElementById("soc-overlay").classList.remove("hidden");
+}
+function renderSocStep() {
+  const { steps, idx } = state.soc;
+  document.getElementById("soc-progress").textContent = `Pregunta ${idx + 1} de ${steps.length}`;
+  const q = document.getElementById("soc-question");
+  q.innerHTML = steps[idx].q;
+  applyHighlights(q);
+  document.getElementById("soc-user-answer").value = "";
+  document.getElementById("soc-reveal").style.display = "none";
+  document.getElementById("soc-show").style.display = "";
+  document.getElementById("soc-next").style.display = "none";
+}
+function socShow() {
+  const { steps, idx } = state.soc;
+  const reveal = document.getElementById("soc-reveal");
+  reveal.innerHTML = steps[idx].a;
+  applyHighlights(reveal);
+  reveal.style.display = "";
+  document.getElementById("soc-show").style.display = "none";
+  if (idx + 1 < steps.length) document.getElementById("soc-next").style.display = "";
+}
+function socNext() { state.soc.idx += 1; renderSocStep(); }
+
+/* ---------- repaso ---------- */
+function openReview() {
+  const list = document.getElementById("review-list");
+  const map = exerciseIndex();
+  // los resueltos, en el orden en que se resolvieron (orden de inserción de las claves)
+  const done = Object.keys(state.progress.exercises)
+    .filter(id => state.progress.exercises[id].status === "done" && map[id]);
+  list.innerHTML = "";
+  if (!done.length) {
+    list.innerHTML = `<p>Todavía no resolviste ningún ejercicio: el repaso se activa cuando haya algo que repasar.</p>`;
+  } else {
+    for (const id of done.slice(0, 6)) {
+      const info = map[id];
+      const btn = document.createElement("button");
+      btn.className = "rev-item";
+      btn.innerHTML = `${info.title}<small>${info.levelTitle} · ${info.topicTitle}</small>`;
+      btn.onclick = () => {
+        document.getElementById("review-overlay").classList.add("hidden");
+        openTopic(info.levelId, info.topicId, info.exIdx);
+      };
+      list.appendChild(btn);
+    }
+  }
+  document.getElementById("review-overlay").classList.remove("hidden");
+}
+
+/* ---------- export / import ---------- */
+function doExport() {
+  const blob = new Blob([JSON.stringify(state.progress, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "python-dojo-progreso.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+function doImport(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!data.exercises) throw new Error("formato inválido");
+      state.progress = data;
+      if (!state.progress.tutorials) state.progress.tutorials = {};
+      if (!state.progress.days) state.progress.days = {};
+      saveProgress();
+      applyTheme();
+      renderSidebar();
+      if (state.progress.lastTopic) {
+        const { levelId, topicId, exIdx } = state.progress.lastTopic;
+        openTopic(levelId, topicId, exIdx);
+      }
+      alert("Progreso importado.");
+    } catch (e) { alert("No pude leer ese archivo: " + e.message); }
+  };
+  reader.readAsText(file);
+}
+
+/* ---------- autosave ---------- */
+let saveTimer = null;
+function scheduleAutosave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    if (state.playground) {
+      state.progress.playgroundCode = getCode();
+      saveProgress();
+      return;
+    }
+    const ex = currentExercise();
+    if (!ex) return;   // en tutorial no se autoguarda: el código es descartable
+    exRecord(ex.id).code = getCode();
+    saveProgress();
+  }, 600);
+}
+
+/* ---------- editor fallback (textarea): tab, enter, atajos ---------- */
+editorTA.addEventListener("keydown", (e) => {
+  if (cmEditor) return;
+  if (e.key === "Tab") {
+    e.preventDefault();
+    const s = editorTA.selectionStart, t = editorTA.selectionEnd;
+    editorTA.value = editorTA.value.slice(0, s) + "    " + editorTA.value.slice(t);
+    editorTA.selectionStart = editorTA.selectionEnd = s + 4;
+  }
+  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+    e.preventDefault();
+    doVerify();
+  }
+  if (e.key === "Enter" && !e.metaKey && !e.ctrlKey) {
+    const s = editorTA.selectionStart;
+    const before = editorTA.value.slice(0, s);
+    const line = before.slice(before.lastIndexOf("\n") + 1);
+    const indent = (line.match(/^\s*/) || [""])[0] + (line.trimEnd().endsWith(":") ? "    " : "");
+    if (indent) {
+      e.preventDefault();
+      editorTA.value = before + "\n" + indent + editorTA.value.slice(editorTA.selectionEnd);
+      editorTA.selectionStart = editorTA.selectionEnd = s + 1 + indent.length;
+    }
+  }
+});
+editorTA.addEventListener("input", () => { if (!cmEditor) scheduleAutosave(); });
+
+/* ---------- wiring ---------- */
+document.getElementById("btn-run").onclick = doRun;
+document.getElementById("btn-verify").onclick = doVerify;
+document.getElementById("btn-hint").onclick = doHint;
+document.getElementById("btn-solution").onclick = () => showSolution(true);
+document.getElementById("btn-reset-code").onclick = () => {
+  const ex = currentExercise();
+  if (ex && confirm("¿Volver al código inicial? Tu versión actual se pierde.")) {
+    exRecord(ex.id).code = null;
+    saveProgress();
+    setCode(ex.starter);
+  }
+};
+document.getElementById("btn-tut-next").onclick = tutNext;
+document.getElementById("btn-tut-prev").onclick = tutPrev;
+document.getElementById("btn-theme").onclick = () => {
+  state.progress.theme = state.progress.theme === "light" ? "dark" : "light";
+  saveProgress();
+  applyTheme();
+};
+document.getElementById("btn-review").onclick = openReview;
+document.getElementById("review-close").onclick = () => document.getElementById("review-overlay").classList.add("hidden");
+document.getElementById("btn-socratic").onclick = openSocratic;
+document.getElementById("soc-show").onclick = socShow;
+document.getElementById("soc-next").onclick = socNext;
+document.getElementById("soc-close").onclick = () => document.getElementById("soc-overlay").classList.add("hidden");
+document.getElementById("btn-export").onclick = doExport;
+document.getElementById("btn-import").onclick = () => document.getElementById("import-file").click();
+document.getElementById("import-file").addEventListener("change", (e) => {
+  if (e.target.files[0]) doImport(e.target.files[0]);
+  e.target.value = "";
+});
+document.getElementById("welcome-start").onclick = () => {
+  state.progress.welcomed = true;
+  saveProgress();
+  document.getElementById("welcome-overlay").classList.add("hidden");
+};
+
+/* ---------- arranque ---------- */
+loadProgress();
+applyTheme();
+renderSidebar();
+if (state.progress.lastTopic) {
+  const { levelId, topicId, exIdx } = state.progress.lastTopic;
+  if (findTopic(levelId, topicId)) openTopic(levelId, topicId, exIdx);
+  else openTopic("basico", topicsOf("basico")[0].id, null);
+} else {
+  const first = topicsOf("basico")[0];
+  if (first) openTopic("basico", first.id, null);
+}
+if (!state.progress.welcomed) document.getElementById("welcome-overlay").classList.remove("hidden");
+
+// El editor profesional y Python se cargan en segundo plano.
+initCodeMirror().then(() => {
+  // re-cargar el contenido vigente en el editor nuevo
+  if (cmEditor) {
+    if (state.playground) setCode(state.progress.playgroundCode || PLAYGROUND_SAMPLE);
+    else if (inTutorial()) { const s = currentTutStep(); if (s) setCode(s.code); }
+    else { const ex = currentExercise(); if (ex) { const rec = exRecord(ex.id); setCode(rec.code != null ? rec.code : ex.starter); } }
+  }
+});
+setTimeout(() => { ensurePyodide().catch(() => {}); }, 1500);
+</script>
+</body>
+</html>
