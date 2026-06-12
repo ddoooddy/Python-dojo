@@ -184,6 +184,11 @@
   .chip.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
   .chip.done { color: var(--green); border-color: var(--green); }
   .chip.done.active { background: var(--green-soft); }
+  .chip.locked { opacity: .4; cursor: not-allowed; border-style: dashed; }
+  .chip.locked:hover { border-color: var(--border-strong); color: var(--text-2); }
+  #unlock-info { font-size: 12.5px; color: var(--text-3); margin: -14px 0 22px; }
+  .topic-item.locked { opacity: .45; cursor: default; }
+  .topic-item.locked:hover { background: none; color: var(--text-2); }
 
   .ex-header { display: flex; align-items: baseline; gap: 14px; margin-bottom: 10px; flex-wrap: wrap; }
   #ex-title { font-size: 17.5px; font-weight: 650; letter-spacing: -0.01em; }
@@ -283,7 +288,7 @@
 
   /* ---------- Overlays ---------- */
   .overlay {
-    position: fixed; inset: 0; background: rgba(8, 10, 13, .6); z-index: 50;
+    position: fixed; inset: 0; background: rgba(8, 10, 13, .6); z-index: 200;
     display: flex; align-items: center; justify-content: center; padding: 24px;
   }
   .overlay.hidden { display: none; }
@@ -323,11 +328,59 @@
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 5px; border: 2px solid var(--bg); }
   ::-webkit-scrollbar-track { background: transparent; }
+
+  /* ---------- Mobile ---------- */
+  #header-tools { display: flex; align-items: center; gap: 2px; }
+  #btn-menu {
+    display: none; background: none; border: 1px solid var(--border-strong); border-radius: 6px;
+    color: var(--text); width: 38px; height: 34px; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  #sidebar-backdrop { display: none; }
+  #sidebar-tools { border-top: 1px solid var(--border); margin-top: 14px; padding: 12px 14px; }
+  #sidebar-tools:empty { display: none; }
+  #sidebar-tools #header-tools { flex-wrap: wrap; gap: 4px; }
+
+  @media (max-width: 820px) {
+    html, body { height: 100dvh; }
+    header { flex-wrap: wrap; gap: 8px 10px; padding: 10px 14px; }
+    header h1 span { display: none; }
+    #btn-menu { display: inline-flex; }
+    #global-progress { order: 10; flex-basis: 100%; max-width: none; }
+    #streak-label, #py-status { font-size: 11.5px; }
+
+    #sidebar {
+      position: fixed; top: 0; bottom: 0; left: 0; z-index: 150;
+      width: min(320px, 86vw); border-right: 1px solid var(--border-strong);
+      transform: translateX(-105%); transition: transform .22s ease;
+      box-shadow: 0 0 48px var(--shadow); padding-top: 14px;
+    }
+    #sidebar.open { transform: translateX(0); }
+    #sidebar-backdrop.open { display: block; position: fixed; inset: 0; z-index: 149; background: rgba(8, 10, 13, .55); }
+
+    #main { padding: 18px 16px 90px; }
+    #topic-title { font-size: 20px; }
+    #concept-box summary { padding: 12px 16px; }
+    #concept-content { padding: 14px 16px 18px; }
+    #ex-prompt { padding: 14px 16px; }
+    #work-grid { gap: 14px; }
+    /* 16px evita que iOS haga zoom al enfocar el editor */
+    #editor { min-height: 240px; font-size: 16px; }
+    .CodeMirror.cm-s-dojo { height: 260px; font-size: 16px; }
+    #output-box { min-height: 130px; max-height: 280px; }
+    #toolbar .kbd-hint { display: none; }
+    .btn, .btn-quiet { padding: 8px 14px; }
+    .chip { min-width: 40px; height: 40px; }
+    .topic-item { padding: 10px 22px; }
+    .modal { padding: 24px 20px; max-height: 90vh; }
+  }
 </style>
 </head>
 <body>
 
 <header>
+  <button id="btn-menu" aria-label="Abrir menú de temas">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+  </button>
   <h1>Python Dojo<span>Práctica deliberada de Python</span></h1>
   <div id="global-progress">
     <div class="progress-bar"><div class="progress-fill" id="global-fill" style="width:0%"></div></div>
@@ -335,15 +388,21 @@
   </div>
   <span id="streak-label"></span>
   <span id="py-status">Python sin cargar</span>
-  <button class="btn-quiet" id="btn-review" title="Volver a resolver ejercicios que ya pasaste: la memoria se construye repitiendo">Repaso</button>
-  <button class="btn-quiet" id="btn-theme" title="Alternar tema claro / oscuro">Tema claro</button>
-  <button class="btn-quiet" id="btn-export" title="Descargar tu progreso como archivo JSON">Exportar</button>
-  <button class="btn-quiet" id="btn-import" title="Restaurar progreso desde un archivo JSON">Importar</button>
+  <div id="header-tools">
+    <button class="btn-quiet" id="btn-review" title="Volver a resolver ejercicios que ya pasaste: la memoria se construye repitiendo">Repaso</button>
+    <button class="btn-quiet" id="btn-theme" title="Alternar tema claro / oscuro">Tema claro</button>
+    <button class="btn-quiet" id="btn-export" title="Descargar tu progreso como archivo JSON">Exportar</button>
+    <button class="btn-quiet" id="btn-import" title="Restaurar progreso desde un archivo JSON">Importar</button>
+  </div>
   <input type="file" id="import-file" accept=".json" style="display:none">
 </header>
 
 <div id="layout">
-  <nav id="sidebar"></nav>
+  <div id="sidebar-backdrop"></div>
+  <nav id="sidebar">
+    <div id="sidebar-nav"></div>
+    <div id="sidebar-tools"></div>
+  </nav>
   <main id="main">
     <div id="main-inner">
       <div id="breadcrumb"></div>
@@ -357,6 +416,7 @@
         <button class="btn" id="btn-socratic">Explicame por qué — modo socrático</button>
       </div>
       <div id="ex-chips"></div>
+      <div id="unlock-info" style="display:none"></div>
       <div id="exercise-panel">
         <div class="ex-header">
           <span id="ex-title"></span>
@@ -432,6 +492,7 @@
     <div class="modal-sub">Práctica deliberada, método socrático</div>
     <p>Acá se aprende <strong>resolviendo</strong>, sin adivinar nada: cada tema arranca con una sección <strong>Concepto</strong> que explica todo desde cero, sigue con un <strong>tutorial interactivo</strong> donde ejecutás código y ves qué pasa, y recién entonces vienen los ejercicios. La solución aparece después de que intentás, con su porqué.</p>
     <p>El código Python corre de verdad en tu navegador y el progreso se guarda solo. Para experimentar libre tenés el <strong>Playground</strong> (abajo a la izquierda); para fijar lo aprendido, el botón <strong>Repaso</strong> de arriba. Punto de partida recomendado: <strong>Básico → Variables y tipos</strong>.</p>
+    <p>Para que el volumen no abrume, los ejercicios se desbloquean <strong>de a 5 cada 24 horas</strong>, en orden: cada día te espera un lote nuevo. Lo ya resuelto queda siempre disponible.</p>
     <p style="margin-top:18px"><button class="btn btn-primary" id="welcome-start">Comenzar</button></p>
   </div>
 </div>
@@ -477,7 +538,7 @@ const LEVELS = [
 const STORAGE_KEY = "python-dojo-v1";
 
 const state = {
-  progress: { exercises: {}, tutorials: {}, days: {}, lastTopic: null, welcomed: false, theme: "dark", playgroundCode: null },
+  progress: { exercises: {}, tutorials: {}, days: {}, lastTopic: null, welcomed: false, theme: "dark", playgroundCode: null, unlockStart: null },
   currentLevel: null,
   currentTopic: null,
   currentEx: 0,          // -1 = tutorial del tema
@@ -497,6 +558,7 @@ function loadProgress() {
     if (!state.progress.tutorials) state.progress.tutorials = {};
     if (!state.progress.days) state.progress.days = {};
   } catch (e) { console.warn("No se pudo leer el progreso:", e); }
+  if (!state.progress.unlockStart) state.progress.unlockStart = Date.now();
 }
 function saveProgress() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress)); }
 function exRecord(id) {
@@ -646,9 +708,50 @@ function exerciseIndex() {
   return map;
 }
 
+/* ---------- desbloqueo progresivo: 5 ejercicios cada 24 h, en orden ---------- */
+const UNLOCK_BATCH = 5;
+const UNLOCK_MS = 24 * 60 * 60 * 1000;
+let lastUnlockCount = -1;
+let EX_ORDER = null;
+function exOrder() {
+  if (!EX_ORDER) { EX_ORDER = {}; allExercises().forEach((ex, i) => { EX_ORDER[ex.id] = i; }); }
+  return EX_ORDER;
+}
+function unlockedCount() {
+  const periods = Math.floor((Date.now() - state.progress.unlockStart) / UNLOCK_MS) + 1;
+  return Math.min(allExercises().length, periods * UNLOCK_BATCH);
+}
+function nextUnlockAt() {
+  if (unlockedCount() >= allExercises().length) return null;
+  const periods = Math.floor((Date.now() - state.progress.unlockStart) / UNLOCK_MS) + 1;
+  return state.progress.unlockStart + periods * UNLOCK_MS;
+}
+function isUnlockedEx(ex) {
+  // lo que ya tocaste no se vuelve a bloquear nunca
+  const rec = state.progress.exercises[ex.id];
+  if (rec && (rec.status === "done" || rec.status === "tried")) return true;
+  return exOrder()[ex.id] < unlockedCount();
+}
+function topicUnlocked(t) { return t.exercises.some(isUnlockedEx); }
+function fmtCountdown(ms) {
+  if (ms <= 60000) return "menos de 1 min";
+  let h = Math.floor(ms / 3600000);
+  let m = Math.round((ms % 3600000) / 60000);
+  if (m === 60) { h += 1; m = 0; }
+  return h > 0 ? `${h} h ${m} min` : `${m} min`;
+}
+function renderUnlockInfo(t) {
+  const el = document.getElementById("unlock-info");
+  const lockedHere = t.exercises.filter(ex => !isUnlockedEx(ex)).length;
+  const at = nextUnlockAt();
+  if (!lockedHere || !at) { el.style.display = "none"; el.textContent = ""; return; }
+  el.style.display = "";
+  el.textContent = `Se desbloquean ${UNLOCK_BATCH} ejercicios nuevos cada 24 horas — próximo lote en ${fmtCountdown(at - Date.now())}.`;
+}
+
 /* ---------- render: sidebar ---------- */
 function renderSidebar() {
-  const sb = document.getElementById("sidebar");
+  const sb = document.getElementById("sidebar-nav");
   sb.innerHTML = "";
   for (const lvl of LEVELS) {
     const topics = topicsOf(lvl.id);
@@ -666,13 +769,15 @@ function renderSidebar() {
 
     for (const t of topics) {
       const tDone = t.exercises.filter(e => exRecord(e.id).status === "done").length;
+      const locked = !topicUnlocked(t);
       const el = document.createElement("div");
-      el.className = "topic-item" + (t.isProject ? " is-project" : "");
+      el.className = "topic-item" + (t.isProject ? " is-project" : "") + (locked ? " locked" : "");
       if (!state.playground && state.currentLevel === lvl.id && state.currentTopic === t.id) el.classList.add("active");
       const cls = tDone === t.exercises.length ? "done" : (tDone > 0 ? "partial" : "");
-      const label = tDone === t.exercises.length ? "✓ " + tDone + "/" + t.exercises.length : tDone + "/" + t.exercises.length;
+      const label = locked ? "—" : (tDone === t.exercises.length ? "✓ " + tDone + "/" + t.exercises.length : tDone + "/" + t.exercises.length);
       el.innerHTML = `<span>${t.title}</span><span class="t-prog ${cls}">${label}</span>`;
-      el.onclick = () => openTopic(lvl.id, t.id, null);
+      if (locked) el.title = "Todavía bloqueado: se abren 5 ejercicios nuevos cada 24 horas";
+      else el.onclick = () => openTopic(lvl.id, t.id, null);
       wrap.appendChild(el);
     }
     sb.appendChild(wrap);
@@ -698,14 +803,26 @@ function renderSidebar() {
 
 /* ---------- render: tema / tutorial / ejercicio / playground ---------- */
 function openTopic(levelId, topicId, exIdx) {
+  const t = findTopic(levelId, topicId);
+  if (!t) return;
+  if (!topicUnlocked(t)) {
+    // si el tema sigue bloqueado (p. ej. al restaurar la sesión), ir al último tema accesible
+    let lastLvl = null, lastTopic = null;
+    for (const lvl of LEVELS) for (const tt of topicsOf(lvl.id)) if (topicUnlocked(tt)) { lastLvl = lvl.id; lastTopic = tt.id; }
+    if (lastTopic && lastTopic !== topicId) return openTopic(lastLvl, lastTopic, null);
+    return;
+  }
   state.playground = false;
   state.currentLevel = levelId;
   state.currentTopic = topicId;
-  const t = findTopic(levelId, topicId);
   if (exIdx === null || exIdx === undefined) {
-    exIdx = (t && t.tutorial && !state.progress.tutorials[topicId]) ? -1 : 0;
+    exIdx = (t.tutorial && !state.progress.tutorials[topicId]) ? -1 : 0;
+  }
+  if (exIdx >= 0 && t.exercises[exIdx] && !isUnlockedEx(t.exercises[exIdx])) {
+    exIdx = Math.max(0, t.exercises.findIndex(isUnlockedEx));
   }
   state.currentEx = exIdx;
+  closeSidebar();
   state.tutStep = 0;
   state.progress.lastTopic = { levelId, topicId, exIdx: state.currentEx };
   saveProgress();
@@ -752,10 +869,18 @@ function renderTopic() {
     if (i === state.currentEx) c.classList.add("active");
     const base = t.isProject ? "Proyecto" : String(i + 1);
     c.textContent = rec.status === "done" ? (t.isProject ? "Proyecto ✓" : "✓") : base;
-    c.title = ex.title;
-    c.onclick = () => { state.currentEx = i; renderTopic(); };
+    if (isUnlockedEx(ex)) {
+      c.title = ex.title;
+      c.onclick = () => { state.currentEx = i; renderTopic(); };
+    } else {
+      c.classList.add("locked");
+      c.disabled = true;
+      c.title = "Bloqueado: llega con el próximo lote de ejercicios";
+    }
     chips.appendChild(c);
   });
+  renderUnlockInfo(t);
+  lastUnlockCount = unlockedCount();
 
   if (inTutorial()) renderTutorial();
   else renderExercise();
@@ -859,7 +984,9 @@ const PLAYGROUND_SAMPLE = '# Playground: experimenta libre, nada se evalua.\n# n
 function openPlayground() {
   state.playground = true;
   state.currentEx = 0;
+  closeSidebar();
   renderSidebar();
+  document.getElementById("unlock-info").style.display = "none";
   document.getElementById("breadcrumb").textContent = "Herramientas · Sandbox";
   document.getElementById("topic-title").textContent = "Playground";
   document.getElementById("topic-intro").innerHTML = "Un espacio sin consignas ni tests: escribí lo que quieras y ejecutalo. Acá se prueba esa duda de \"¿qué pasa si…?\" que te quedó dando vueltas en cualquier tema.";
@@ -1020,19 +1147,24 @@ async function doRun() {
 function nextTarget() {
   const t = findTopic(state.currentLevel, state.currentTopic);
   if (state.currentEx + 1 < t.exercises.length) {
+    if (!isUnlockedEx(t.exercises[state.currentEx + 1])) return { locked: true };
     return { label: "Siguiente ejercicio", go: () => { state.currentEx += 1; renderTopic(); document.getElementById("main").scrollTop = 0; } };
   }
   const topics = topicsOf(state.currentLevel);
   const ti = topics.findIndex(x => x.id === t.id);
   if (ti + 1 < topics.length) {
     const nt = topics[ti + 1];
+    if (!topicUnlocked(nt)) return { locked: true };
     return { label: "Siguiente tema: " + nt.title, go: () => openTopic(state.currentLevel, nt.id, null) };
   }
   const li = LEVELS.findIndex(l => l.id === state.currentLevel);
   if (li + 1 < LEVELS.length) {
     const nl = LEVELS[li + 1];
     const first = topicsOf(nl.id)[0];
-    if (first) return { label: "Siguiente nivel: " + nl.title, go: () => openTopic(nl.id, first.id, null) };
+    if (first) {
+      if (!topicUnlocked(first)) return { locked: true };
+      return { label: "Siguiente nivel: " + nl.title, go: () => openTopic(nl.id, first.id, null) };
+    }
   }
   return null;
 }
@@ -1056,9 +1188,14 @@ async function doVerify() {
     saveProgress();
     setOutput(res.output || "");
     const nt = nextTarget();
-    const nextBtn = nt ? `<button class="btn" id="btn-next-ex">${nt.label}</button>` : " Completaste el último ejercicio del dojo.";
-    setFeedback("<strong>Correcto.</strong> Todos los tests pasaron. Abajo tenés la solución de referencia y el porqué — compará tu enfoque con ese." + nextBtn, "fb-ok");
-    if (nt) document.getElementById("btn-next-ex").onclick = nt.go;
+    let tail;
+    if (nt && nt.go) tail = `<button class="btn" id="btn-next-ex">${nt.label}</button>`;
+    else if (nt && nt.locked) {
+      const at = nextUnlockAt();
+      tail = at ? ` El siguiente ejercicio se desbloquea en ${fmtCountdown(at - Date.now())} — buen momento para un <strong>Repaso</strong>.` : "";
+    } else tail = " Completaste el último ejercicio del dojo.";
+    setFeedback("<strong>Correcto.</strong> Todos los tests pasaron. Abajo tenés la solución de referencia y el porqué — compará tu enfoque con ese." + tail, "fb-ok");
+    if (nt && nt.go) document.getElementById("btn-next-ex").onclick = nt.go;
     showSolution(true);
     renderSidebar();
     renderChipsOnly();
@@ -1197,6 +1334,7 @@ function doImport(file) {
       state.progress = data;
       if (!state.progress.tutorials) state.progress.tutorials = {};
       if (!state.progress.days) state.progress.days = {};
+      if (!state.progress.unlockStart) state.progress.unlockStart = Date.now();
       saveProgress();
       applyTheme();
       renderSidebar();
@@ -1253,6 +1391,27 @@ editorTA.addEventListener("keydown", (e) => {
   }
 });
 editorTA.addEventListener("input", () => { if (!cmEditor) scheduleAutosave(); });
+
+/* ---------- navegación mobile ---------- */
+function closeSidebar() {
+  document.getElementById("sidebar").classList.remove("open");
+  document.getElementById("sidebar-backdrop").classList.remove("open");
+}
+document.getElementById("btn-menu").onclick = () => {
+  const open = document.getElementById("sidebar").classList.toggle("open");
+  document.getElementById("sidebar-backdrop").classList.toggle("open", open);
+};
+document.getElementById("sidebar-backdrop").onclick = closeSidebar;
+
+// en pantallas chicas, los botones del header viven al pie del menú lateral
+const mqMobile = window.matchMedia("(max-width: 820px)");
+function placeHeaderTools() {
+  const tools = document.getElementById("header-tools");
+  if (mqMobile.matches) document.getElementById("sidebar-tools").appendChild(tools);
+  else document.querySelector("header").appendChild(tools);
+}
+if (mqMobile.addEventListener) mqMobile.addEventListener("change", placeHeaderTools);
+placeHeaderTools();
 
 /* ---------- wiring ---------- */
 document.getElementById("btn-run").onclick = doRun;
@@ -1316,6 +1475,26 @@ initCodeMirror().then(() => {
   }
 });
 setTimeout(() => { ensurePyodide().catch(() => {}); }, 1500);
+
+// cada minuto: refrescar el contador y, si llegó un lote nuevo, aplicarlo sin recargar
+setInterval(() => {
+  if (state.playground || !state.currentTopic) return;
+  const t = findTopic(state.currentLevel, state.currentTopic);
+  if (!t) return;
+  if (unlockedCount() !== lastUnlockCount) {
+    lastUnlockCount = unlockedCount();
+    renderSidebar();
+    if (!inTutorial()) {
+      const ex = currentExercise();
+      if (ex) { exRecord(ex.id).code = getCode(); saveProgress(); }
+      renderTopic();
+    } else {
+      renderUnlockInfo(t);   // en tutorial no se re-renderiza: no pisar el código del paso
+    }
+  } else {
+    renderUnlockInfo(t);
+  }
+}, 60000);
 </script>
 </body>
 </html>
